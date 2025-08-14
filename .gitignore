@@ -124,4 +124,5 @@ CMakeLists.txt.user*
 .pch/
 .rcc/
 .uic/
+/music-tree/build*/
 /build*/
