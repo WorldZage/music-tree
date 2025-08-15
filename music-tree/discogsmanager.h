@@ -4,23 +4,67 @@
 #include <QObject>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QJsonDocument>
+
+struct ArtistData {
+    QString name;
+    QString id;
+    QSet<QString> releaseIds;
+};
+
 
 class DiscogsManager : public QObject
 {
     Q_OBJECT
+
 public:
     explicit DiscogsManager(QObject *parent = nullptr);
 
-    Q_INVOKABLE void fetchArtist(int artistId);
+    // Entry point from QML
+    Q_INVOKABLE void fetchArtist(QString artistId);
+    Q_INVOKABLE void searchArtistByName(const QString &name);
+
 
 signals:
     void artistDataReady(const QString &json);
+    void releasesDataReady(const QString &json);
 
 private slots:
-    void onArtistReply(QNetworkReply *reply);
+    // Single dispatcher for all finished replies
+    void onNetworkReply(QNetworkReply *reply);
+    void filterMastersAndLog(const QJsonArray &releases );
 
 private:
-    QNetworkAccessManager m_netManager;
+    // Internal helpers
+    void fetchReleasesFromUrl(const QString &url, QString artistId, const QString &artistName); // updated
+    void onArtistDataReceived(const QJsonDocument &jsonDoc);
+    void onReleasesDataReceived(const QJsonDocument &jsonDoc);
+
+    void onSearchResultReceived(const QJsonDocument &jsonDoc);
+    void checkForOverlaps(const ArtistData &newArtist);
+
+    // Track what we are waiting for
+    enum class RequestType { None, Search, Artist, Releases };
+    RequestType m_pendingRequestType = RequestType::None;
+
+    enum class SearchType { Release, Master, Artist, Label};
+
+
+    QVector<ArtistData> artistSet;
+
+
+    QNetworkAccessManager m_networkManager;
+
+    // Discogs API token. Initialized in the constructor.
+    QString m_pat_token ;
+    QByteArray app_version = "QtDiscogsApp/1.0";
+
+    // store temp artist info between API calls
+    QString m_currentArtistId = "";
+    QString m_currentArtistName;
+
 };
+
+
 
 #endif // DISCOGSMANAGER_H
