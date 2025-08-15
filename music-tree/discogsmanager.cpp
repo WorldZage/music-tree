@@ -14,7 +14,7 @@ DiscogsManager::DiscogsManager(QObject *parent)
             this, &DiscogsManager::onNetworkReply);
 
     QString iniPath = QCoreApplication::applicationDirPath() +
-                      "/../../../config.ini";
+                      "/../../../music-tree-config.ini";
     qDebug() << "ini path: " + iniPath;
 
     QSettings settings(iniPath, QSettings::IniFormat);
