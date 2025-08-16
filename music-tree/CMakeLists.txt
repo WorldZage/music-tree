@@ -5,6 +5,7 @@ project(music-tree VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Quick)
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
 qt_standard_project_setup(REQUIRES 6.8)
 
@@ -33,8 +34,9 @@ set_target_properties(appmusic-tree PROPERTIES
 )
 
 target_link_libraries(appmusic-tree
-    PRIVATE Qt6::Quick
+    PRIVATE Qt6::Widgets Qt6::Qml Qt6::Gui Qt6::Quick
 )
+
 
 include(GNUInstallDirs)
 install(TARGETS appmusic-tree

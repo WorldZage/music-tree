@@ -1,16 +1,17 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-
+import QtQuick.Shapes
+import QtQml.XmlListModel
 
 ApplicationWindow {
-    width: 800
-    height: 600
+    width: 1000
+    height: 700
     visible: true
     title: "Music Tree"
 
     ColumnLayout {
-        anchors.centerIn: parent
+        anchors.fill: parent
         spacing: 10
 
         TextField {
@@ -18,9 +19,8 @@ ApplicationWindow {
             placeholderText: "Enter artist name..."
             Layout.fillWidth: true
             onAccepted: {
-                if (searchField.text.trim() !== "") {
+                if (searchField.text.trim() !== "")
                     discogsManager.searchArtistByName(searchField.text.trim())
-                }
             }
         }
 
@@ -28,25 +28,9 @@ ApplicationWindow {
             text: "Search"
             Layout.alignment: Qt.AlignHCenter
             onClicked: {
-                if (searchField.text.trim() !== "") {
+                if (searchField.text.trim() !== "")
                     discogsManager.searchArtistByName(searchField.text.trim())
-                }
             }
         }
-
-        Connections {
-            target: discogsManager
-            function onArtistDataReady(json) {
-                console.log("Artist JSON:", json)
-            }
-            function onReleasesDataReady(json) {
-                console.log("Releases JSON:", json)
-            }
-            function filterMastersAndLog(json) {
-                console.log("Masters JSON:", json)
-        }
-
     }
 }
-}
-

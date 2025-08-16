@@ -15,7 +15,6 @@ DiscogsManager::DiscogsManager(QObject *parent)
 
     QString iniPath = QCoreApplication::applicationDirPath() +
                       "/../../../music-tree-config.ini";
-    qDebug() << "ini path: " + iniPath;
 
     QSettings settings(iniPath, QSettings::IniFormat);
 
@@ -236,6 +235,11 @@ void DiscogsManager::checkForOverlaps(const ArtistData &newArtist)
             for (const auto &rel : std::as_const(shared)) {
                 qDebug() << "   Release:" << rel.second << "(" << rel.first << ")";
             }
+            // Emit signal for the graph
+            emit artistAdded(newArtist.name, QStringList{other.name});
+        }
+        else if (shared.isEmpty()) {
+            emit artistAdded(newArtist.name, QStringList{});
         }
     }
 }

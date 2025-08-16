@@ -28,6 +28,8 @@ public:
 signals:
     void artistDataReady(const QString &json);
     void releasesDataReady(const QString &json);
+    void artistAdded(const QString &artistName, const QStringList &collaborators);
+
 
 private slots:
     // Single dispatcher for all finished replies
