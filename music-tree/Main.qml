@@ -34,13 +34,6 @@ ApplicationWindow {
             }
         }
 
-        Button {
-            text: "Fetch Daft Punk"
-            onClicked: {
-                discogsManager.fetchArtist(1289)
-            }
-        }
-
         Connections {
             target: discogsManager
             function onArtistDataReady(json) {

@@ -89,6 +89,19 @@ void DiscogsManager::onNetworkReply(QNetworkReply *reply)
     reply->deleteLater();
 }
 
+QString DiscogsManager::extractId(QJsonValue idValue) {
+    QString artistId;
+    if (idValue.isString()) {
+        artistId = idValue.toString();
+    } else if (idValue.isDouble()) {  // JSON numbers come in as double in Qt
+        artistId = QString::number(static_cast<qint64>(idValue.toDouble()));
+    } else {
+        qWarning() << "Unexpected ID type:" << idValue;
+    }
+
+    return artistId;
+}
+
 void DiscogsManager::onSearchResultReceived(const QJsonDocument &jsonDoc)
 {
     if (!jsonDoc.isObject()) {
@@ -104,15 +117,8 @@ void DiscogsManager::onSearchResultReceived(const QJsonDocument &jsonDoc)
 
     QJsonObject artistObj = results.first().toObject();
     QJsonValue idValue = artistObj["id"];
-    QString artistId;
+    QString artistId = extractId(idValue);
 
-    if (idValue.isString()) {
-        artistId = idValue.toString();
-    } else if (idValue.isDouble()) {  // JSON numbers come in as double in Qt
-        artistId = QString::number(static_cast<qint64>(idValue.toDouble()));
-    } else {
-        qWarning() << "Unexpected ID type:" << idValue;
-    }
 
     QString name = artistObj["title"].toString();
 
@@ -130,7 +136,7 @@ void DiscogsManager::onArtistDataReceived(const QJsonDocument &jsonDoc)
 
     QJsonObject artistObj = jsonDoc.object();
     QString name = artistObj["name"].toString();
-    QString id = artistObj["id"].toString();
+    QString id = extractId(artistObj["id"]);
     QString releasesUrl = artistObj["releases_url"].toString();
 
     if (!releasesUrl.isEmpty()) {
@@ -157,34 +163,78 @@ void DiscogsManager::onReleasesDataReceived(const QJsonDocument &jsonDoc)
     for (const QJsonValue &releaseValue : std::as_const(releases)) {
         QJsonObject releaseObj = releaseValue.toObject();
         QString type = releaseObj["type"].toString();
+
         if (type == "master") {
-            newArtist.releaseIds.insert(releaseObj["id"].toVariant().toString());
+
+            newArtist.releasesById.insert(
+                extractId(releaseObj["id"]),
+                releaseObj["title"].toString()
+            );
         }
     }
+    qDebug() << "name" << newArtist.name << ". id: " << newArtist.id ;
+    // Merge-safe logic
+    auto it = std::find_if(artistSet.begin(), artistSet.end(),
+        [&](const ArtistData &a) { return a.id == newArtist.id; });
 
-    artistSet.append(newArtist);
-    checkForOverlaps(newArtist);
+    if (it == artistSet.end()) {
+        // First time seeing this artist
+        artistSet.append(newArtist);
+        checkForOverlaps(newArtist);
+    } else {
+        // Merge new releases into existing artist
+        for (auto relIt = newArtist.releasesById.constBegin();
+             relIt != newArtist.releasesById.constEnd(); ++relIt) {
+            it->releasesById.insert(relIt.key(), relIt.value());
+        }
+        checkForOverlaps(*it);
+    }
 
-    filterMastersAndLog(releases);
+    //filterMastersAndLog(releases);
+}
+
+void DiscogsManager::removeArtist(const QString &artistId)
+{
+    // Remove from artistSet
+    artistSet.erase(std::remove_if(artistSet.begin(), artistSet.end(),
+                                   [&](const ArtistData &a) { return a.id == artistId; }), artistSet.end());
+
+    // Remove overlaps containing this artist
+    for (auto it = overlaps.begin(); it != overlaps.end();) {
+        if (it.key().first == artistId || it.key().second == artistId) {
+            it = overlaps.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+static QPair<QString, QString> orderedPair(const QString &a, const QString &b) {
+    return a < b ? qMakePair(a, b) : qMakePair(b, a);
 }
 
 void DiscogsManager::checkForOverlaps(const ArtistData &newArtist)
 {
-    qDebug() << "checkforoverlaps";
-
+    qDebug() << "checkforoverlaps" ;
     for (const ArtistData &other : std::as_const(artistSet)) {
-        if (other.id == newArtist.id) { continue; }
-        qDebug() << other.name;
-        for (const QString &id : std::as_const(other.releaseIds)) {
-            qDebug() << "release id " << id;
+        if (other.id == newArtist.id) continue;
+
+        QList<QPair<QString, QString>> shared;
+        for (auto it = newArtist.releasesById.constBegin();
+             it != newArtist.releasesById.constEnd(); ++it) {
+            if (other.releasesById.contains(it.key())) {
+                shared.append(qMakePair(it.key(), it.value())); // (releaseId, releaseName)
+            }
         }
 
+        if (!shared.isEmpty()) {
+            auto key = orderedPair(newArtist.id, other.id);
+            overlaps.insert(key, shared);
 
-        QSet<QString> overlap = other.releaseIds & newArtist.releaseIds;
-        if (!overlap.isEmpty()) {
+            // Optional debug output
             qDebug() << "Overlap between" << newArtist.name << "and" << other.name << ":";
-            for (const QString &id : std::as_const(overlap)) {
-                qDebug() << "   Release ID:" << id;
+            for (const auto &rel : std::as_const(shared)) {
+                qDebug() << "   Release:" << rel.second << "(" << rel.first << ")";
             }
         }
     }

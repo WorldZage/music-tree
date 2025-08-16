@@ -9,7 +9,7 @@
 struct ArtistData {
     QString name;
     QString id;
-    QSet<QString> releaseIds;
+    QHash<QString, QString> releasesById;
 };
 
 
@@ -43,6 +43,9 @@ private:
     void onSearchResultReceived(const QJsonDocument &jsonDoc);
     void checkForOverlaps(const ArtistData &newArtist);
 
+    void removeArtist(const QString &artistId);
+    QString extractId(QJsonValue idValue);
+
     // Track what we are waiting for
     enum class RequestType { None, Search, Artist, Releases };
     RequestType m_pendingRequestType = RequestType::None;
@@ -51,6 +54,9 @@ private:
 
 
     QVector<ArtistData> artistSet;
+    QHash<QPair<QString, QString>, QList<QPair<QString, QString>>> overlaps;
+    // key: (artistId1, artistId2)
+    // value: list of (releaseId, releaseName)
 
 
     QNetworkAccessManager m_networkManager;
