@@ -12,7 +12,6 @@ struct ArtistData {
     QHash<QString, QString> releasesById;
 };
 
-
 class DiscogsManager : public QObject
 {
     Q_OBJECT

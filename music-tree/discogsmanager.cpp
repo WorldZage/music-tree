@@ -215,8 +215,11 @@ static QPair<QString, QString> orderedPair(const QString &a, const QString &b) {
 void DiscogsManager::checkForOverlaps(const ArtistData &newArtist)
 {
     qDebug() << "checkforoverlaps" ;
+    QStringList collaborators;
+
     for (const ArtistData &other : std::as_const(artistSet)) {
-        if (other.id == newArtist.id) continue;
+        if (other.id == newArtist.id)
+            continue;
 
         QList<QPair<QString, QString>> shared;
         for (auto it = newArtist.releasesById.constBegin();
@@ -230,18 +233,17 @@ void DiscogsManager::checkForOverlaps(const ArtistData &newArtist)
             auto key = orderedPair(newArtist.id, other.id);
             overlaps.insert(key, shared);
 
-            // Optional debug output
             qDebug() << "Overlap between" << newArtist.name << "and" << other.name << ":";
             for (const auto &rel : std::as_const(shared)) {
                 qDebug() << "   Release:" << rel.second << "(" << rel.first << ")";
             }
-            // Emit signal for the graph
-            emit artistAdded(newArtist.name, QStringList{other.name});
-        }
-        else if (shared.isEmpty()) {
-            emit artistAdded(newArtist.name, QStringList{});
+
+            collaborators.append(other.name);
         }
     }
+
+    // Always emit one signal per new artist
+    emit artistAdded(newArtist.name, collaborators);
 }
 
 void DiscogsManager::filterMastersAndLog(const QJsonArray &releases )
