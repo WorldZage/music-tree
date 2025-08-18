@@ -7,10 +7,27 @@
 #include <QJsonDocument>
 
 struct ArtistData {
-    QString name;
     QString id;
+    QString name;
     QHash<QString, QString> releasesById;
 };
+
+struct SearchState {
+    QString query;
+};
+
+struct ArtistState {
+    QString artistId;
+};
+
+struct ReleasesState {
+    QString artistId;
+    QString artistName;
+    QString url;
+    int page = 1;
+};
+
+using FetchState = std::variant<SearchState, ArtistState, ReleasesState>;
 
 class DiscogsManager : public QObject
 {
@@ -20,7 +37,6 @@ public:
     explicit DiscogsManager(QObject *parent = nullptr);
 
     // Entry point from QML
-    Q_INVOKABLE void fetchArtist(QString artistId);
     Q_INVOKABLE void searchArtistByName(const QString &name);
 
 
@@ -37,22 +53,17 @@ private slots:
 
 private:
     // Internal helpers
-    void fetchReleasesFromUrl(const QString &url, QString artistId, const QString &artistName); // updated
-    void onArtistDataReceived(const QJsonDocument &jsonDoc);
-    void onReleasesDataReceived(const QJsonDocument &jsonDoc);
+    void onSearchResultReceived(const QJsonDocument &jsonDoc, SearchState searchState);
+    void onArtistDataReceived(const QJsonDocument &jsonDoc, ArtistState artistState);
+    void onReleasesDataReceived(const QJsonDocument &jsonDoc, ReleasesState releasesState);
 
-    void onSearchResultReceived(const QJsonDocument &jsonDoc);
-    void checkForOverlaps(const ArtistData &newArtist);
+    void fetchArtist(QString artistId);
+    void fetchReleasesFromUrl(const QString &url, QString artistId, const QString &artistName); // updated
+
+    void generateCollaborations(const ArtistData &newArtist);
 
     void removeArtist(const QString &artistId);
     QString extractId(QJsonValue idValue);
-
-    // Track what we are waiting for
-    enum class RequestType { None, Search, Artist, Releases };
-    RequestType m_pendingRequestType = RequestType::None;
-
-    enum class SearchType { Release, Master, Artist, Label};
-
 
     QVector<ArtistData> artistSet;
     QHash<QPair<QString, QString>, QList<QPair<QString, QString>>> overlaps;
@@ -65,10 +76,6 @@ private:
     // Discogs API token. Initialized in the constructor.
     QString m_pat_token ;
     QByteArray app_version = "QtDiscogsApp/1.0";
-
-    // store temp artist info between API calls
-    QString m_currentArtistId = "";
-    QString m_currentArtistName;
 
 };
 

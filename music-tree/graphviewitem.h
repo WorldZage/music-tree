@@ -46,5 +46,6 @@ private:
     double repulsion = 2000.0;
     double springLength = 100.0;
     double springStrength = 0.01;
+    double nodeRadius = 20.0;
 
 };

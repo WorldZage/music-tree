@@ -37,9 +37,9 @@ void DiscogsManager::searchArtistByName(const QString &name)
     QString authHeader = "Discogs token=" + m_pat_token;
     request.setRawHeader("Authorization", authHeader.toUtf8());
     request.setRawHeader("User-Agent", app_version);
-
-    m_pendingRequestType = RequestType::Search;
-    m_networkManager.get(request);
+    auto state = new FetchState{SearchState{ .query = name }};
+    QNetworkReply* reply = m_networkManager.get(request);
+    reply->setProperty("fetchState", QVariant::fromValue<void*>(state));
 }
 
 void DiscogsManager::fetchArtist(QString artistId)
@@ -50,8 +50,10 @@ void DiscogsManager::fetchArtist(QString artistId)
     request.setRawHeader("Authorization", authHeader.toUtf8());
     request.setRawHeader("User-Agent", app_version);
 
-    m_pendingRequestType = RequestType::Artist;
-    m_networkManager.get(request);
+
+    auto state = new FetchState{ArtistState{.artistId = artistId}};
+    QNetworkReply* reply = m_networkManager.get(request);
+    reply->setProperty("fetchState", QVariant::fromValue<void*>(state));
 }
 
 void DiscogsManager::fetchReleasesFromUrl(const QString &url, QString artistId, const QString &artistName)
@@ -61,16 +63,22 @@ void DiscogsManager::fetchReleasesFromUrl(const QString &url, QString artistId, 
     request.setRawHeader("Authorization", authHeader.toUtf8());
     request.setRawHeader("User-Agent", app_version);
 
-    m_currentArtistId = artistId;
-    m_currentArtistName = artistName;
-    m_pendingRequestType = RequestType::Releases;
-    m_networkManager.get(request);
+
+    auto state = new FetchState{ReleasesState{.artistId = artistId,
+                                              .artistName = artistName,
+                                              .url=url,
+                                              .page=1}};
+    QNetworkReply* reply = m_networkManager.get(request);
+    reply->setProperty("fetchState", QVariant::fromValue<void*>(state));
 }
 
 void DiscogsManager::onNetworkReply(QNetworkReply *reply)
 {
+    FetchState* state = static_cast<FetchState*>(reply->property("fetchState").value<void*>());
+
     if (reply->error() != QNetworkReply::NoError) {
         qWarning() << "Network error:" << reply->errorString();
+        delete state;
         reply->deleteLater();
         return;
     }
@@ -78,13 +86,19 @@ void DiscogsManager::onNetworkReply(QNetworkReply *reply)
     QByteArray data = reply->readAll();
     QJsonDocument jsonDoc = QJsonDocument::fromJson(data);
 
-    switch (m_pendingRequestType) {
-    case RequestType::Artist:   onArtistDataReceived(jsonDoc); break;
-    case RequestType::Releases: onReleasesDataReceived(jsonDoc); break;
-    case RequestType::Search:   onSearchResultReceived(jsonDoc); break;
-    default: break;
-    }
 
+    std::visit([&](auto&& s) {
+        using T = std::decay_t<decltype(s)>;
+        if constexpr (std::is_same_v<T, SearchState>) {
+            onSearchResultReceived(jsonDoc, s);
+        } else if constexpr (std::is_same_v<T, ArtistState>) {
+            onArtistDataReceived(jsonDoc, s);
+        } else if constexpr (std::is_same_v<T, ReleasesState>) {
+            onReleasesDataReceived(jsonDoc, s);
+        }
+    }, *state);
+
+    delete state;
     reply->deleteLater();
 }
 
@@ -101,7 +115,7 @@ QString DiscogsManager::extractId(QJsonValue idValue) {
     return artistId;
 }
 
-void DiscogsManager::onSearchResultReceived(const QJsonDocument &jsonDoc)
+void DiscogsManager::onSearchResultReceived(const QJsonDocument &jsonDoc, const SearchState searchState)
 {
     if (!jsonDoc.isObject()) {
         qWarning() << "Invalid JSON received for search";
@@ -126,7 +140,7 @@ void DiscogsManager::onSearchResultReceived(const QJsonDocument &jsonDoc)
 }
 
 
-void DiscogsManager::onArtistDataReceived(const QJsonDocument &jsonDoc)
+void DiscogsManager::onArtistDataReceived(const QJsonDocument &jsonDoc, ArtistState artistState)
 {
     if (!jsonDoc.isObject()) {
         qWarning() << "Invalid JSON received for artist";
@@ -143,7 +157,7 @@ void DiscogsManager::onArtistDataReceived(const QJsonDocument &jsonDoc)
     }
 }
 
-void DiscogsManager::onReleasesDataReceived(const QJsonDocument &jsonDoc)
+void DiscogsManager::onReleasesDataReceived(const QJsonDocument &jsonDoc, ReleasesState releasesState)
 {
     qDebug() << "onreleasedata";
     if (!jsonDoc.isObject()) {
@@ -154,42 +168,66 @@ void DiscogsManager::onReleasesDataReceived(const QJsonDocument &jsonDoc)
     QJsonObject obj = jsonDoc.object();
     QJsonArray releases = obj["releases"].toArray();
 
-    // Build new artist data
-    ArtistData newArtist;
-    newArtist.id = m_currentArtistId;
-    newArtist.name = m_currentArtistName;
+    // Build or merge artist data
+    auto it = std::find_if(artistSet.begin(), artistSet.end(),
+                           [&](const ArtistData &a) { return a.id == releasesState.artistId; });
 
+    ArtistData *artistPtr = nullptr;
+    if (it == artistSet.end()) {
+        artistSet.append(ArtistData{.id = releasesState.artistId, .name = releasesState.artistName, .releasesById = {}});
+        artistPtr = &artistSet.back();
+    } else {
+        artistPtr = &(*it);
+    }
+
+    // Insert releases
     for (const QJsonValue &releaseValue : std::as_const(releases)) {
         QJsonObject releaseObj = releaseValue.toObject();
-        QString type = releaseObj["type"].toString();
-
-        if (type == "master") {
-
-            newArtist.releasesById.insert(
-                extractId(releaseObj["id"]),
-                releaseObj["title"].toString()
-            );
+        if (releaseObj["type"].toString() == "master") {
+            QString releaseId = extractId(releaseObj["id"]);
+            artistPtr->releasesById.insert(releaseId, releaseObj["title"].toString());
+            qDebug() << "release name:" << releaseObj["title"].toString();
         }
     }
-    qDebug() << "name" << newArtist.name << ". id: " << newArtist.id ;
-    // Merge-safe logic
-    auto it = std::find_if(artistSet.begin(), artistSet.end(),
-        [&](const ArtistData &a) { return a.id == newArtist.id; });
 
-    if (it == artistSet.end()) {
-        // First time seeing this artist
-        artistSet.append(newArtist);
-        checkForOverlaps(newArtist);
-    } else {
-        // Merge new releases into existing artist
-        for (auto relIt = newArtist.releasesById.constBegin();
-             relIt != newArtist.releasesById.constEnd(); ++relIt) {
-            it->releasesById.insert(relIt.key(), relIt.value());
-        }
-        checkForOverlaps(*it);
+
+
+    // Check pagination
+    QJsonObject pagination = obj["pagination"].toObject();
+    int page = pagination["page"].toInt();
+    int pages = pagination["pages"].toInt();
+    const int maxPages = 10;
+
+    qDebug() << "artist: " << artistPtr->name <<". page: " << page;
+    if ((page < pages) && page < maxPages) {
+        // Fetch next page
+        int nextPage = page + 1;
+        QString nextUrl = QString("%1?per_page=100&page=%2")
+                              .arg(releasesState.url)
+                              .arg(nextPage);
+
+        auto nextState = new FetchState{ReleasesState{.artistId = releasesState.artistId,
+                                                      .artistName = releasesState.artistName,
+                                                      .url = releasesState.url,
+                                                      .page = nextPage}};
+        //releasesState;
+        //nextState.page = nextPage;
+
+        QNetworkRequest request(nextUrl);
+        QString authHeader = "Discogs token=" + m_pat_token;
+        request.setRawHeader("Authorization", authHeader.toUtf8());
+        request.setRawHeader("User-Agent", app_version);
+
+        QNetworkReply *reply = m_networkManager.get(request);
+        // Store the state for this reply
+        reply->setProperty("fetchState", QVariant::fromValue<void*>(nextState));
+    }
+    else {
+        generateCollaborations(*artistPtr);
     }
 
-    //filterMastersAndLog(releases);
+    //qDebug() << "number of releases: " << releases.size();
+    //qDebug() << "name" << artistPtr->name << ". id: " << artistPtr->id ;
 }
 
 void DiscogsManager::removeArtist(const QString &artistId)
@@ -212,7 +250,7 @@ static QPair<QString, QString> orderedPair(const QString &a, const QString &b) {
     return a < b ? qMakePair(a, b) : qMakePair(b, a);
 }
 
-void DiscogsManager::checkForOverlaps(const ArtistData &newArtist)
+void DiscogsManager::generateCollaborations(const ArtistData &newArtist)
 {
     qDebug() << "checkforoverlaps" ;
     QStringList collaborators;

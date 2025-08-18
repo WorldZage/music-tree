@@ -11,26 +11,6 @@ GraphViewItem::GraphViewItem(QQuickItem *parent)
     timer.start(30); // ~33 FPS
 }
 
-/*
-void GraphViewItem::setNodes(const QList<QPointF> &nodes) {
-    if (m_nodes != nodes) {
-        m_nodes = nodes;
-        emit nodesChanged();
-        update();
-    }
-}
-
-void GraphViewItem::setEdges(const QList<QLineF> &edges) {
-    if (m_edges != edges) {
-        m_edges = edges;
-        emit edgesChanged();
-        update();
-    }
-}
-
-*/
-
-
 void GraphViewItem::addArtistNode(const QString &name) {
     if (artistIndex.contains(name)) return;
 
@@ -44,7 +24,6 @@ void GraphViewItem::addArtistNode(const QString &name) {
     nodes.push_back(node);
     artistIndex.insert(name, idx);
 }
-
 
 void GraphViewItem::addCollaboration(const QStringList &artistNames) {
     for (int i = 0; i < artistNames.size(); ++i) {
@@ -95,14 +74,22 @@ void GraphViewItem::updateLayout() {
         nodes[e.b].velocity += dir * force;
     }
 
+    const double w = width();
+    const double h = height();
+
     // Integrate + damping
     for (auto &n : nodes) {
         n.pos += n.velocity;
         n.velocity *= 0.85;
 
         // Keep inside bounds
+        /*
         n.pos.setX(std::clamp(n.pos.x(), 0.0, width()));
         n.pos.setY(std::clamp(n.pos.y(), 0.0, height()));
+        */
+        // Constrain nodes fully inside the QML box
+        n.pos.setX(std::clamp(n.pos.x(), nodeRadius, w - nodeRadius));
+        n.pos.setY(std::clamp(n.pos.y(), nodeRadius, h - nodeRadius));
     }
 
     update(); // trigger repaint
@@ -121,11 +108,11 @@ void GraphViewItem::paint(QPainter *painter)
 
     // Draw nodes
     for (const auto &n : std::as_const(nodes)) {
-        double r = 20.0;
+
         painter->setBrush(Qt::white);
         painter->setPen(Qt::black);
-        painter->drawEllipse(n.pos, r, r);
-        painter->drawText(n.pos.x()-r/2, n.pos.y()-r-5, n.name);
+        painter->drawEllipse(n.pos, nodeRadius, nodeRadius);
+        painter->drawText(n.pos.x()-nodeRadius/2, n.pos.y()-nodeRadius-5, n.name);
     }
 }
 
