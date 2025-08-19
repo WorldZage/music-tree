@@ -22,16 +22,16 @@ ApplicationWindow {
                 id: searchField
                 placeholderText: "Enter artist name..."
                 onAccepted: {
-                    if (text.trim() !== "") {
-                        discogsManager.searchArtistByName(text.trim())
-                    }
+                        if (text.trim() !== "") {
+                            artistService.searchArtist(text.trim())
+                        }
                 }
             }
             Button {
                 text: "Search"
                 onClicked: {
                     if (searchField.text.trim() !== "") {
-                        discogsManager.searchArtistByName(searchField.text.trim())
+                        artistService.searchArtist(text.trim())
                     }
                 }
             }

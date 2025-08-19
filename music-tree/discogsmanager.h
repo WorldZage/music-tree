@@ -2,9 +2,15 @@
 #define DISCOGSMANAGER_H
 
 #include <QObject>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
-#include <QJsonDocument>
+#include <QFuture>
+#include <QtConcurrent/QtConcurrent>
+
+#include "artist.h"
 
 struct ArtistData {
     QString id;
@@ -36,46 +42,23 @@ class DiscogsManager : public QObject
 public:
     explicit DiscogsManager(QObject *parent = nullptr);
 
-    // Entry point from QML
-    Q_INVOKABLE void searchArtistByName(const QString &name);
+    // Search Discogs by name, return matching artist IDs
+    QFuture<std::vector<Artist>> search(const QString& name);
 
+    // Fetch complete artist details (profile, releases, etc.)
+    QFuture<std::optional<Artist>> fetchArtist(const QString& artistId);
 
-signals:
-    void artistDataReady(const QString &json);
-    void releasesDataReady(const QString &json);
-    void artistAdded(const QString &artistName, const QStringList &collaborators);
-
-
-private slots:
-    // Single dispatcher for all finished replies
-    void onNetworkReply(QNetworkReply *reply);
-    void filterMastersAndLog(const QJsonArray &releases );
+    QFuture<std::vector<ReleaseInfo>> fetchAllReleases(const QString& url);
 
 private:
-    // Internal helpers
-    void onSearchResultReceived(const QJsonDocument &jsonDoc, SearchState searchState);
-    void onArtistDataReceived(const QJsonDocument &jsonDoc, ArtistState artistState);
-    void onReleasesDataReceived(const QJsonDocument &jsonDoc, ReleasesState releasesState);
-
-    void fetchArtist(QString artistId);
-    void fetchReleasesFromUrl(const QString &url, QString artistId, const QString &artistName); // updated
-
-    void generateCollaborations(const ArtistData &newArtist);
-
-    void removeArtist(const QString &artistId);
-    QString extractId(QJsonValue idValue);
-
-    QVector<ArtistData> artistSet;
-    QHash<QPair<QString, QString>, QList<QPair<QString, QString>>> overlaps;
-    // key: (artistId1, artistId2)
-    // value: list of (releaseId, releaseName)
-
+    void fetchReleasesPage(const QString& pageUrl, QSharedPointer<std::vector<ReleaseInfo>> accumulator, QPromise<std::vector<ReleaseInfo>> promise);
 
     QNetworkAccessManager m_networkManager;
 
     // Discogs API token. Initialized in the constructor.
     QString m_pat_token ;
     QByteArray app_version = "QtDiscogsApp/1.0";
+
 
 };
 

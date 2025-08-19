@@ -5,7 +5,10 @@
 #include <QWidget>
 
 #include "discogsmanager.h"
+#include "databasemanager.h"
 #include "graphviewitem.h"
+#include "artistservice.h"
+
 
 
 
@@ -14,11 +17,17 @@ int main(int argc, char *argv[])
     //QGuiApplication app(argc, argv);
     QApplication app(argc, argv);
     QQmlApplicationEngine engine;
+
+    // Core managers
     DiscogsManager discogs;
-    engine.rootContext()->setContextProperty("discogsManager", &discogs);
+    QString appRoot = QDir::currentPath(); // where app was launched
+    DatabaseManager dbManager = DatabaseManager();
+
+    // Facade service
+    ArtistService artistService(&discogs, &dbManager);
+    engine.rootContext()->setContextProperty("artistService", &artistService);
 
     // Register GraphViewWidget so we can create it from QML
-    //qmlRegisterType<QQuickWidget>("MyApp", 1, 0, "GraphWidget");
     qmlRegisterType<GraphViewItem>("MyApp", 1, 0, "GraphView");
 
 
@@ -40,6 +49,9 @@ int main(int argc, char *argv[])
         qWarning() << "GraphViewItem not found!";
     }
     else {
+        // (Optional) connect service signals to graph, if we expose such from ArtistService
+        // Future feature, If ArtistService later emits an artistLoaded signal
+        /*
         QObject::connect(&discogs, &DiscogsManager::artistAdded,
                          graph, [graph](const QString &name, const QStringList &collabs){
                              graph->addArtistNode(name);
@@ -48,6 +60,7 @@ int main(int argc, char *argv[])
                              }
                              graph->finalizeGraphLayout();
                          });
+        */
     }
 
 
