@@ -8,6 +8,7 @@
 #include "databasemanager.h"
 #include "graphviewitem.h"
 #include "artistservice.h"
+#include "sessionartistmodel.h"
 
 
 
@@ -19,16 +20,15 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
 
     // Core managers
-    DiscogsManager discogs;
-    QString appRoot = QDir::currentPath(); // where app was launched
-    DatabaseManager dbManager = DatabaseManager();
+
 
     // Facade service
-    ArtistService artistService(&discogs, &dbManager);
+    ArtistService artistService = ArtistService();
     engine.rootContext()->setContextProperty("artistService", &artistService);
 
     // Register GraphViewWidget so we can create it from QML
-    qmlRegisterType<GraphViewItem>("MyApp", 1, 0, "GraphView");
+    qmlRegisterType<GraphViewItem>("appmusictree", 1, 0, "GraphView");
+
 
 
     QObject::connect(

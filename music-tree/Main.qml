@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Shapes
 import QtQml.XmlListModel
-import MyApp 1.0
+import appmusictree 1.0
 
 
 ApplicationWindow {
@@ -12,36 +12,39 @@ ApplicationWindow {
     visible: true
     title: "Music Tree"
 
-    Row {
-        Column {
+    SplitView {
+        anchors.fill: parent
+
+        // Left panel
+        ColumnLayout {
+            Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.preferredWidth: parent.width * 0.3
-            spacing: 8
 
             TextField {
                 id: searchField
                 placeholderText: "Enter artist name..."
-                onAccepted: {
-                        if (text.trim() !== "") {
-                            artistService.searchArtist(text.trim())
-                        }
+                onAccepted: if (text.trim() !== "") artistService.searchByName(text.trim())
+            }
+
+            RowLayout {
+                Button {
+                    text: "Search"
+                    onClicked: if (searchField.text.trim() !== "") artistService.searchByName(searchField.text.trim())
+                }
+
+                Button {
+                    text: "Clear DB"
+                    onClicked: artistService.clearDb()
                 }
             }
-            Button {
-                text: "Search"
-                onClicked: {
-                    if (searchField.text.trim() !== "") {
-                        artistService.searchArtist(text.trim())
-                    }
-                }
-            }
+
             Rectangle {
-                width: 1000
-                height: 700
+                Layout.preferredWidth: 300
+                Layout.fillHeight: true
                 color: "white"
                 GraphView {
                     id: graph
-                    objectName: "graph"  // <-- add this line
+                    objectName: "graph"
                     width: parent.width * 0.7
                     height: parent.height * 0.7
                 }
@@ -49,12 +52,36 @@ ApplicationWindow {
                     anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 20 }
                     text: "test"
                 }
-
             }
-
         }
 
+        // Right panel
+        ListView {
+            id: artistList
+            Layout.preferredWidth: 300
+            Layout.fillHeight: true
+            model: sessionArtistModel
 
+            delegate: Rectangle {
+                width: parent.width
+                height: 40
+                color: index % 2 ? "lightgrey" : "white"
 
+                Row {
+                    spacing: 10
+                    Text { text: artistName }
+                    Button {
+                        text: "Remove"
+                        onClicked: sessionManager.removeArtist(index)
+                    }
+                }
+            }
+        }
+    }
+
+    Component.onCompleted: {
+        sessionManager.addArtist("123", "Aphex Twin")
+        sessionManager.addArtist("456", "Squarepusher")
     }
 }
+

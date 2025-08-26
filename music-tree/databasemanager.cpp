@@ -91,7 +91,7 @@ QSqlDatabase DatabaseManager::getThreadConnection() {
 // -----------------------------
 // Find by ID
 // -----------------------------
-std::optional<Artist> DatabaseManager::findArtist(const QString& artistId) const {
+std::optional<Artist> DatabaseManager::findArtistById(const QString& artistId) const {
     QSqlDatabase db = getThreadConnection();
     QSqlQuery query(db);
     query.prepare("SELECT id, name FROM artists WHERE id = :id");
@@ -253,16 +253,46 @@ std::vector<Artist> DatabaseManager::listArtists() const {
 }
 
 // -----------------------------
-// Clear DB
+// Clear DB (wipe all rows, keep schema)
 // -----------------------------
 void DatabaseManager::clear() {
     QSqlDatabase db = getThreadConnection();
     QSqlQuery query(db);
 
-    if (!query.exec("DELETE FROM artists")) {
-        qWarning() << "clear failed:" << query.lastError().text();
+    // Disable foreign key checks temporarily for full wipe
+    if (!query.exec("PRAGMA foreign_keys = OFF;")) {
+        qWarning() << "Failed to disable foreign keys:" << query.lastError().text();
+        return;
     }
+
+    QStringList tables = {
+        "release_labels",
+        "labels",
+        "tracks",
+        "release_artists",
+        "releases",
+        "members",
+        "artists"
+    };
+
+    for (const QString &table : tables) {
+        if (!query.exec(QString("DELETE FROM %1;").arg(table))) {
+            qWarning() << "Failed to clear table" << table << ":" << query.lastError().text();
+        }
+        // Reset AUTOINCREMENT counters as well
+        if (!query.exec(QString("DELETE FROM sqlite_sequence WHERE name='%1';").arg(table))) {
+            // Not all tables have AUTOINCREMENT, so ignore errors
+        }
+    }
+
+    // Re-enable foreign keys
+    if (!query.exec("PRAGMA foreign_keys = ON;")) {
+        qWarning() << "Failed to re-enable foreign keys:" << query.lastError().text();
+    }
+
+    qDebug() << "Database cleared (all rows removed, schema preserved).";
 }
+
 
 // -----------------------------
 // Collaborations
@@ -319,6 +349,25 @@ QMap<QString, std::vector<QString>> DatabaseManager::getAllCollaborations(const 
         QString collaboratorId = query.value(0).toString();
         QString releaseId = query.value(1).toString();
         collaborations[collaboratorId].push_back(releaseId);
+    }
+
+    // TODO: Temporary debug print
+    qDebug() << "Collaborators for artist" << artistId << ":";
+
+    for (auto it = collaborations.constBegin(); it != collaborations.constEnd(); ++it) {
+        QString collaboratorId = it.key();
+
+        // Lookup collaborator name
+        QSqlQuery nameQuery(db);
+        nameQuery.prepare("SELECT name FROM artists WHERE id = :id");
+        nameQuery.bindValue(":id", collaboratorId);
+
+        QString collaboratorName = collaboratorId; // fallback if not found
+        if (nameQuery.exec() && nameQuery.next()) {
+            collaboratorName = nameQuery.value(0).toString();
+        }
+
+        qDebug() << "  -" << collaboratorName << "(" << collaboratorId << ")";
     }
 
     return collaborations;

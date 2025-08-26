@@ -32,7 +32,7 @@ public:
     bool initialize(void);
 
     // Look up artist by ID
-    std::optional<Artist> findArtist(const QString& artistId) const;
+    std::optional<Artist> findArtistById(const QString& artistId) const;
 
     // Look up artist by name
     std::optional<Artist> findArtistByName(const QString& name) const;

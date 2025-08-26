@@ -31,6 +31,9 @@ qt_add_qml_module(appmusic-tree
         SOURCES databasemanager.h databasemanager.cpp
         RESOURCES resources/schema.sql
         RESOURCES
+        SOURCES artist.cpp
+        SOURCES sessionmanager.h sessionmanager.cpp
+        SOURCES sessionartistmodel.h sessionartistmodel.cpp
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.

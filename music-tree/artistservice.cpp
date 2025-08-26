@@ -5,70 +5,98 @@
 #include <QtConcurrent/QtConcurrent>
 
 // Constructor
-ArtistService::ArtistService(DiscogsManager* discogs, DatabaseManager* db)
-    : m_discogs(discogs), m_db(db) {}
+ArtistService::ArtistService(QObject* parent) : QObject(parent){
+
+    // Connect DiscogsManager signals to ArtistService slots
+    connect(&m_discogs, &DiscogsManager::discogsArtistSearchReady,
+            this, &ArtistService::onDiscogsArtistSearchReady);
+
+    connect(&m_discogs, &DiscogsManager::discogsArtistDataReady,
+            this, &ArtistService::onDiscogsDataReady);
+
+    connect(this, &ArtistService::artistFound,
+            this, &ArtistService::onArtistFound);
+
+}
+
+void ArtistService::clearDb(void) {
+    m_db.clear();
+}
 
 // Public: Search by name
-QFuture<std::optional<Artist>> ArtistService::searchArtist(const QString& name) {
-    // Run async so UI doesn’t block
-    return QtConcurrent::run([=]() -> std::optional<Artist> {
-        // First check local DB for matching artist
-        for (const auto& artist : m_db->listArtists()) {
-            if (artist.name.compare(name, Qt::CaseInsensitive) == 0) {
-                return artist; // Found locally
-            }
-        }
-
-        // Otherwise, query Discogs
-        auto discogsResults = m_discogs->search(name).result();
-        if (discogsResults.empty()) {
-            return std::nullopt; // No match found
-        }
-
-        // For now, take first match
-        Artist artist = discogsResults.front();
-
-        // Fetch full details from Discogs (releases, profile, etc.)
-        auto detailed = m_discogs->fetchArtist(artist.id).result();
-        if (!detailed.has_value()) {
-            return std::nullopt;
-        }
-
-        // Cache result in DB
-        cacheArtist(detailed.value());
-        return detailed;
-    });
+void ArtistService::searchByName(const QString& name) {
+    qDebug() << "searching for: " << name;
+    // 1. Check local DB
+    m_discogs.searchForArtistByName(name);
 }
 
-// Public: Get artist data (by ID)
-QFuture<std::optional<Artist>> ArtistService::getArtistData(const QString& artistId) {
-    return QtConcurrent::run([=]() -> std::optional<Artist> {
-        // Check local DB first
-        auto local = m_db->findArtist(artistId);
-        if (local.has_value()) {
-            return local;
-        }
 
-        // Otherwise fetch from Discogs
-        auto detailed = m_discogs->fetchArtist(artistId).result();
-        if (!detailed.has_value()) {
-            return std::nullopt;
-        }
+void ArtistService::onDiscogsArtistSearchReady(const std::vector<Artist>& artists) {
 
-        // Save to DB
-        cacheArtist(detailed.value());
-        return detailed;
-    });
+    qDebug() << "artists found by discog search: " << artists;
+
+    if (artists.empty()) {
+        return;
+    }
+    // TODO: prompt UI selection of top artists found, displaying artist name and artist id.
+    // for now, choose top result.
+    Artist artist = artists.front();
+    // TODO: use the ID from discogs search, to check DB again.
+    auto artistOpt = m_db.findArtistById(artist.id);
+    if (artistOpt.has_value()) {
+        qDebug() << "Found artist by name in DB: " << artist.name;
+        Artist db_artist = artistOpt.value();
+        emit artistFound(db_artist);
+        return;
+    }
+    else {
+        // 2. Not in DB → fetch from Discogs
+        m_discogs.fetchArtist(artist.id);
+        return;
+    }
 }
+
+// Called when DiscogsManager has fetched artist & release info
+void ArtistService::onDiscogsDataReady(const Artist& artist) {
+    // Cache artist & releases asynchronously to DB
+    cacheArtist(artist);
+
+    // Emit signals as if artist was found in DB
+    emit artistFound(artist);
+}
+
+void ArtistService::onArtistFound(const Artist& artist) {
+
+    // TODO: Change to handle this in artistFound.
+    // as well as findCollab call.
+    m_currentUIArtistIds.push_back(artist.id);
+    qDebug() << "current UI artists:" << m_currentUIArtistIds;
+
+    // Find collaborations (TODO: with currently displayed artists)
+    QMap<QString, std::vector<QString>> collabs;
+    collabs = m_db.getAllCollaborations(artist.id);
+    /*
+    for (const auto& otherId : m_currentUIArtistIds) {
+        auto rels = m_db.findCollaborations(artist.id, otherId);
+        if (!rels.empty()) collabs[otherId] = rels;
+    }*/
+    emit collaborationsReady(collabs);
+    qDebug() << "collabs:" << collabs;
+}
+
 
 // Public: list cached artists
 std::vector<Artist> ArtistService::listCachedArtists() const {
-    return m_db->listArtists();
+    return m_db.listArtists();
 }
 
 // Private helper: cache artist in DB
 void ArtistService::cacheArtist(const Artist& artist) {
-    m_db->saveArtist(artist);
+    qDebug() << "Storing Artist: " << artist;
+    //QtConcurrent::run([=]() {
+        m_db.saveArtist(artist);
+        m_db.saveReleases(artist.id, artist.releases);
+    //});
 }
 
 std::vector<ReleaseInfo> ArtistService::parseReleasesJsonArray(const QJsonArray &releasesArray) {
@@ -94,5 +122,5 @@ std::vector<ReleaseInfo> ArtistService::parseReleasesJsonArray(const QJsonArray 
 
 void ArtistService::updateReleasesFromJson(const QJsonArray &jsonReleases, const QString &artistId) {
     auto releases = parseReleasesJsonArray(jsonReleases);
-    m_db->saveReleases(artistId, releases);
+    m_db.saveReleases(artistId, releases);
 }
