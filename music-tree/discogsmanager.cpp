@@ -1,302 +1,228 @@
 #include "discogsmanager.h"
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
-#include <QDebug>
-#include <QSettings>
-#include <QUrlQuery>
-#include <QCoreApplication>
+
 
 DiscogsManager::DiscogsManager(QObject *parent)
     : QObject(parent)
 {
-    connect(&m_networkManager, &QNetworkAccessManager::finished,
-            this, &DiscogsManager::onNetworkReply);
+    //connect(&m_networkManager, &QNetworkAccessManager::finished,
+    //        this, &DiscogsManager::onNetworkReply);
+
 
     QString iniPath = QCoreApplication::applicationDirPath() +
                       "/../../../music-tree-config.ini";
-
     QSettings settings(iniPath, QSettings::IniFormat);
-
     m_pat_token = settings.value("discogs/token").toString();
 
 }
 
-void DiscogsManager::searchArtistByName(const QString &name)
+
+
+void DiscogsManager::searchForArtistByName(const QString& name)
 {
+    qDebug() << "discog search begun with: " << name;
+    // Kick off the async _helper_search (this returns immediately)
+    QFuture<std::vector<Artist>> fSearch = _helper_search(name);
+
+    // Watcher for the search future
+    auto *searchWatcher = new QFutureWatcher<std::vector<Artist>>(this);
+
+    // When the search completes (signal emitted in this object's thread)
+    QObject::connect(searchWatcher, &QFutureWatcherBase::finished,
+                     this, [this, searchWatcher, name]() {
+                         // Take the results
+                         const std::vector<Artist> artists = searchWatcher->result();
+                         searchWatcher->deleteLater();
+
+                         if (artists.empty()) {
+                             qWarning() << "No artists found for" << name;
+                         }
+                         emit discogsArtistSearchReady(artists);
+
+    });
+    // Start watching the search future
+    searchWatcher->setFuture(fSearch);
+    return;
+}
+
+void DiscogsManager::fetchArtist(const QString& artistId) {
+    QFuture<std::optional<Artist>> fDetail = _helper_fetchArtist(artistId);
+
+    // Watcher for the detail future
+    auto *detailWatcher = new QFutureWatcher<std::optional<Artist>>(this);
+    QObject::connect(detailWatcher, &QFutureWatcherBase::finished,
+                     this, [this, detailWatcher]() {
+                         const std::optional<Artist> opt = detailWatcher->result();
+                         detailWatcher->deleteLater();
+
+                         if (!opt.has_value()) {
+                             qWarning() << "Failed to fetch detailed artist info";
+                             return;
+                         }
+
+                         const Artist full = *opt; // copy ok
+                         qDebug() << "artist: " << full.name << ". releases: " << full.releases;
+
+                         emit discogsArtistDataReady(full);
+                     });
+
+    // Start watching the detail future
+    detailWatcher->setFuture(fDetail);
+    return;
+}
+
+// Search artist by name and return a future of vector<Artist> (take first match if desired)
+QFuture<std::vector<Artist>> DiscogsManager::_helper_search(const QString& name)
+{
+    qDebug() << "discog search fnc begun with: " << name;
+    QPromise<std::vector<Artist>> promise;
+    auto future = promise.future();
 
     QString url = "https://api.discogs.com/database/search";
     QUrl qurl(url);
     QUrlQuery query;
     query.addQueryItem("q", name);
     query.addQueryItem("type", "artist");
-    query.addQueryItem("per_page", "1");
+    query.addQueryItem("per_page", "5"); // can adjust
     qurl.setQuery(query);
 
-    QNetworkRequest request(qurl);
-    QString authHeader = "Discogs token=" + m_pat_token;
-    request.setRawHeader("Authorization", authHeader.toUtf8());
+    QNetworkRequest request(qurl);;
+    request.setRawHeader("Authorization", QString("Discogs token=%1").arg(m_pat_token).toUtf8());
     request.setRawHeader("User-Agent", app_version);
-    auto state = new FetchState{SearchState{ .query = name }};
+
     QNetworkReply* reply = m_networkManager.get(request);
-    reply->setProperty("fetchState", QVariant::fromValue<void*>(state));
+
+    QObject::connect(reply, &QNetworkReply::finished, [reply, p = std::move(promise)]() mutable {
+        std::vector<Artist> result;
+        if (reply->error() == QNetworkReply::NoError) {
+            QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+            QJsonArray results = doc.object()["results"].toArray();
+            for (const auto& val : results) {
+                QJsonObject obj = val.toObject();
+                QString id = obj["id"].isString() ? obj["id"].toString()
+                                                  : QString::number(static_cast<qint64>(obj["id"].toDouble()));
+                result.push_back(Artist{.id = id, .name = obj["title"].toString()});
+            }
+        } else {
+            qWarning() << "Discogs search error:" << reply->errorString();
+        }
+        reply->deleteLater();
+        p.addResult(result);
+        p.finish();
+    });
+
+    return future;
 }
 
-void DiscogsManager::fetchArtist(QString artistId)
+// Fetch detailed artist data including releases
+QFuture<std::optional<Artist>> DiscogsManager::_helper_fetchArtist(const QString& artistId)
 {
+    qDebug() << "discog fetchArtist fnc begun with: " << artistId;
+    QPromise<std::optional<Artist>> promise;
+    auto future = promise.future();
+
     QString url = QString("https://api.discogs.com/artists/%1").arg(artistId);
     QNetworkRequest request(url);
-    QString authHeader = "Discogs token=" + m_pat_token;
-    request.setRawHeader("Authorization", authHeader.toUtf8());
+    request.setRawHeader("Authorization", QString("Discogs token=%1").arg(m_pat_token).toUtf8());
     request.setRawHeader("User-Agent", app_version);
 
-
-    auto state = new FetchState{ArtistState{.artistId = artistId}};
     QNetworkReply* reply = m_networkManager.get(request);
-    reply->setProperty("fetchState", QVariant::fromValue<void*>(state));
-}
 
-void DiscogsManager::fetchReleasesFromUrl(const QString &url, QString artistId, const QString &artistName)
-{
-    QNetworkRequest request(url + "?per_page=100&page=1");
-    QString authHeader = "Discogs token=" + m_pat_token;
-    request.setRawHeader("Authorization", authHeader.toUtf8());
-    request.setRawHeader("User-Agent", app_version);
-
-
-    auto state = new FetchState{ReleasesState{.artistId = artistId,
-                                              .artistName = artistName,
-                                              .url=url,
-                                              .page=1}};
-    QNetworkReply* reply = m_networkManager.get(request);
-    reply->setProperty("fetchState", QVariant::fromValue<void*>(state));
-}
-
-void DiscogsManager::onNetworkReply(QNetworkReply *reply)
-{
-    FetchState* state = static_cast<FetchState*>(reply->property("fetchState").value<void*>());
-
-    if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << "Network error:" << reply->errorString();
-        delete state;
-        reply->deleteLater();
-        return;
-    }
-
-    QByteArray data = reply->readAll();
-    QJsonDocument jsonDoc = QJsonDocument::fromJson(data);
-
-
-    std::visit([&](auto&& s) {
-        using T = std::decay_t<decltype(s)>;
-        if constexpr (std::is_same_v<T, SearchState>) {
-            onSearchResultReceived(jsonDoc, s);
-        } else if constexpr (std::is_same_v<T, ArtistState>) {
-            onArtistDataReceived(jsonDoc, s);
-        } else if constexpr (std::is_same_v<T, ReleasesState>) {
-            onReleasesDataReceived(jsonDoc, s);
+    QObject::connect(reply, &QNetworkReply::finished, [reply, artistId, p = std::move(promise), this]() mutable {
+        if (reply->error() != QNetworkReply::NoError) {
+            qWarning() << "Fetch artist error:" << reply->errorString();
+            reply->deleteLater();
+            p.addResult(std::nullopt);
+            p.finish();
+            return;
         }
-    }, *state);
 
-    delete state;
-    reply->deleteLater();
-}
+        QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
+        Artist artist;
+        artist.id = QString::number(obj["id"].toDouble());
+        artist.name = obj["name"].toString();
+        artist.profile = obj["profile"].toString();
+        artist.resourceUrl = obj["resource_url"].toString();
 
-QString DiscogsManager::extractId(QJsonValue idValue) {
-    QString artistId;
-    if (idValue.isString()) {
-        artistId = idValue.toString();
-    } else if (idValue.isDouble()) {  // JSON numbers come in as double in Qt
-        artistId = QString::number(static_cast<qint64>(idValue.toDouble()));
-    } else {
-        qWarning() << "Unexpected ID type:" << idValue;
-    }
-
-    return artistId;
-}
-
-void DiscogsManager::onSearchResultReceived(const QJsonDocument &jsonDoc, const SearchState searchState)
-{
-    if (!jsonDoc.isObject()) {
-        qWarning() << "Invalid JSON received for search";
-        return;
-    }
-
-    QJsonArray results = jsonDoc.object()["results"].toArray();
-    if (results.isEmpty()) {
-        qWarning() << "No artist found";
-        return;
-    }
-
-    QJsonObject artistObj = results.first().toObject();
-    QJsonValue idValue = artistObj["id"];
-    QString artistId = extractId(idValue);
-
-
-    QString name = artistObj["title"].toString();
-
-    qDebug() << "Found artist:" << name << "(" << artistId << ")";
-    fetchArtist(artistId);
-}
-
-
-void DiscogsManager::onArtistDataReceived(const QJsonDocument &jsonDoc, ArtistState artistState)
-{
-    if (!jsonDoc.isObject()) {
-        qWarning() << "Invalid JSON received for artist";
-        return;
-    }
-
-    QJsonObject artistObj = jsonDoc.object();
-    QString name = artistObj["name"].toString();
-    QString id = extractId(artistObj["id"]);
-    QString releasesUrl = artistObj["releases_url"].toString();
-
-    if (!releasesUrl.isEmpty()) {
-        fetchReleasesFromUrl(releasesUrl, id, name);
-    }
-}
-
-void DiscogsManager::onReleasesDataReceived(const QJsonDocument &jsonDoc, ReleasesState releasesState)
-{
-    qDebug() << "onreleasedata";
-    if (!jsonDoc.isObject()) {
-        qWarning() << "Invalid JSON received for releases";
-        return;
-    }
-
-    QJsonObject obj = jsonDoc.object();
-    QJsonArray releases = obj["releases"].toArray();
-
-    // Build or merge artist data
-    auto it = std::find_if(artistSet.begin(), artistSet.end(),
-                           [&](const ArtistData &a) { return a.id == releasesState.artistId; });
-
-    ArtistData *artistPtr = nullptr;
-    if (it == artistSet.end()) {
-        artistSet.append(ArtistData{.id = releasesState.artistId, .name = releasesState.artistName, .releasesById = {}});
-        artistPtr = &artistSet.back();
-    } else {
-        artistPtr = &(*it);
-    }
-
-    // Insert releases
-    for (const QJsonValue &releaseValue : std::as_const(releases)) {
-        QJsonObject releaseObj = releaseValue.toObject();
-        if (releaseObj["type"].toString() == "master") {
-            QString releaseId = extractId(releaseObj["id"]);
-            artistPtr->releasesById.insert(releaseId, releaseObj["title"].toString());
-            qDebug() << "release name:" << releaseObj["title"].toString();
-        }
-    }
-
-
-
-    // Check pagination
-    QJsonObject pagination = obj["pagination"].toObject();
-    int page = pagination["page"].toInt();
-    int pages = pagination["pages"].toInt();
-    const int maxPages = 10;
-
-    qDebug() << "artist: " << artistPtr->name <<". page: " << page;
-    if ((page < pages) && page < maxPages) {
-        // Fetch next page
-        int nextPage = page + 1;
-        QString nextUrl = QString("%1?per_page=100&page=%2")
-                              .arg(releasesState.url)
-                              .arg(nextPage);
-
-        auto nextState = new FetchState{ReleasesState{.artistId = releasesState.artistId,
-                                                      .artistName = releasesState.artistName,
-                                                      .url = releasesState.url,
-                                                      .page = nextPage}};
-        //releasesState;
-        //nextState.page = nextPage;
-
-        QNetworkRequest request(nextUrl);
-        QString authHeader = "Discogs token=" + m_pat_token;
-        request.setRawHeader("Authorization", authHeader.toUtf8());
-        request.setRawHeader("User-Agent", app_version);
-
-        QNetworkReply *reply = m_networkManager.get(request);
-        // Store the state for this reply
-        reply->setProperty("fetchState", QVariant::fromValue<void*>(nextState));
-    }
-    else {
-        generateCollaborations(*artistPtr);
-    }
-
-    //qDebug() << "number of releases: " << releases.size();
-    //qDebug() << "name" << artistPtr->name << ". id: " << artistPtr->id ;
-}
-
-void DiscogsManager::removeArtist(const QString &artistId)
-{
-    // Remove from artistSet
-    artistSet.erase(std::remove_if(artistSet.begin(), artistSet.end(),
-                                   [&](const ArtistData &a) { return a.id == artistId; }), artistSet.end());
-
-    // Remove overlaps containing this artist
-    for (auto it = overlaps.begin(); it != overlaps.end();) {
-        if (it.key().first == artistId || it.key().second == artistId) {
-            it = overlaps.erase(it);
+        // If you want releases, fetch them next
+        QString releasesUrl = obj["releases_url"].toString();
+        if (!releasesUrl.isEmpty()) {
+            _helper_fetchAllReleases(releasesUrl).then([p = std::move(p), artist](std::vector<ReleaseInfo> releases) mutable {
+                artist.releases = releases;
+                p.addResult(artist);
+                p.finish();
+            });
         } else {
-            ++it;
+            p.addResult(artist);
+            p.finish();
         }
-    }
+
+        reply->deleteLater();
+    });
+
+    return future;
 }
 
-static QPair<QString, QString> orderedPair(const QString &a, const QString &b) {
-    return a < b ? qMakePair(a, b) : qMakePair(b, a);
-}
-
-void DiscogsManager::generateCollaborations(const ArtistData &newArtist)
+// Member helper
+void DiscogsManager::_helper_fetchReleasesPage(const QString& baseUrl,
+                                       int page,
+                                       QSharedPointer<std::vector<ReleaseInfo>> accumulator,
+                                       QPromise<std::vector<ReleaseInfo>> promise)
 {
-    qDebug() << "checkforoverlaps" ;
-    QStringList collaborators;
+    QString url = QString("%1?per_page=100&page=%2").arg(baseUrl).arg(page);
+    qDebug() << "discog fetchrelease fnc begun. time: " <<QDateTime::currentSecsSinceEpoch() << ". pageurl: " << url;
 
-    for (const ArtistData &other : std::as_const(artistSet)) {
-        if (other.id == newArtist.id)
-            continue;
+    QNetworkRequest request(url);
+    request.setRawHeader("Authorization", QString("Discogs token=%1").arg(m_pat_token).toUtf8());
+    request.setRawHeader("User-Agent", app_version);
 
-        QList<QPair<QString, QString>> shared;
-        for (auto it = newArtist.releasesById.constBegin();
-             it != newArtist.releasesById.constEnd(); ++it) {
-            if (other.releasesById.contains(it.key())) {
-                shared.append(qMakePair(it.key(), it.value())); // (releaseId, releaseName)
-            }
-        }
+    QNetworkReply* reply = m_networkManager.get(request);
+    QObject::connect(reply, &QNetworkReply::finished,
+                     [this, reply, baseUrl, page, accumulator, p = std::move(promise)]() mutable {
 
-        if (!shared.isEmpty()) {
-            auto key = orderedPair(newArtist.id, other.id);
-            overlaps.insert(key, shared);
+                         if (reply->error() == QNetworkReply::NoError) {
+                             QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
+                             QJsonArray releases = obj["releases"].toArray();
 
-            qDebug() << "Overlap between" << newArtist.name << "and" << other.name << ":";
-            for (const auto &rel : std::as_const(shared)) {
-                qDebug() << "   Release:" << rel.second << "(" << rel.first << ")";
-            }
+                             for (const auto& val : std::as_const(releases)) {
+                                 QJsonObject r = val.toObject();
+                                 if (r["type"].toString() == "master") {
+                                     ReleaseInfo info;
+                                     info.id = QString::number(r["id"].toDouble());
+                                     info.title = r["title"].toString();
+                                     info.year = r["year"].toInt();
+                                     info.resourceUrl = r["resource_url"].toString();
+                                     info.role = r["role"].toString();
+                                     accumulator->push_back(info);
+                                 }
+                             }
+                             // Pagination
+                             QJsonObject pagination = obj["pagination"].toObject();
+                             int totalPages = pagination["pages"].toInt();
+                             qDebug() << "total pages: " << totalPages;
+                             if (page < std::min(totalPages, maxPages)) {
+                                 _helper_fetchReleasesPage(baseUrl, page + 1, accumulator, std::move(p));
+                                 reply->deleteLater();
+                                 return;
+                             }
+                         } else {
+                             qWarning() << "Fetch releases error:" << reply->errorString();
+                         }
 
-            collaborators.append(other.name);
-        }
-    }
-
-    // Always emit one signal per new artist
-    emit artistAdded(newArtist.name, collaborators);
+                         // Finished
+                         reply->deleteLater();
+                         p.addResult(*accumulator);
+                         p.finish();
+                     });
 }
 
-void DiscogsManager::filterMastersAndLog(const QJsonArray &releases )
+QFuture<std::vector<ReleaseInfo>> DiscogsManager::_helper_fetchAllReleases(const QString& url)
 {
-
-    QJsonArray masterReleases;
-    for (const QJsonValue &val : std::as_const(releases)) {
-        QJsonObject releaseObj = val.toObject();
-        if (releaseObj["type"].toString() == "master") {
-            masterReleases.append(releaseObj);
-            qDebug() << "Master Release:" << releaseObj["title"].toString() <<
-                "( " << releaseObj["id"] << ")";
-        }
-    }
-
-    qDebug() << "Total master releases:" << masterReleases.size();
+    qDebug() << "discog fetchallreleases fnc";
+    QPromise<std::vector<ReleaseInfo>> promise;
+    auto future = promise.future();
+    auto accumulator = QSharedPointer<std::vector<ReleaseInfo>>::create();
+    _helper_fetchReleasesPage(url, 1, accumulator, std::move(promise));
+    return future;
 }
+
 
