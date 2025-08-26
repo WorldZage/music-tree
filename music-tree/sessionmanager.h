@@ -16,9 +16,13 @@ public:
 
     const QVector<SessionArtist>& artists() const { return m_artists; }
 
-    Q_INVOKABLE void addArtist(const SessionArtist& artist);
-    Q_INVOKABLE void addArtist(const QString& artistName, const QString& artistId);
-    Q_INVOKABLE void removeArtist(const QString& artistId);
+    void addArtist(const SessionArtist& artist);
+    void addArtist(const QString& artistName, const QString& artistId);
+    void removeArtist(const QString& artistId);
+    void removeArtistByListIndex(const int listIndex);
+    bool containsArtistId(const QString& artistId);
+
+
     void clear();
 
 signals:

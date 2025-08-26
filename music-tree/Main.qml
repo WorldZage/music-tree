@@ -63,25 +63,20 @@ ApplicationWindow {
             model: sessionArtistModel
 
             delegate: Rectangle {
-                width: parent.width
+                width: ListView.view ? ListView.view.width : 0
                 height: 40
                 color: index % 2 ? "lightgrey" : "white"
 
                 Row {
                     spacing: 10
-                    Text { text: artistName }
+                    Text { text: artistName + qsTr(" (") + artistId + qsTr(")")}
                     Button {
                         text: "Remove"
-                        onClicked: sessionManager.removeArtist(index)
+                        onClicked: sessionArtistModel.removeSessionArtistByListIndex(index)
                     }
                 }
             }
         }
-    }
-
-    Component.onCompleted: {
-        sessionManager.addArtist("123", "Aphex Twin")
-        sessionManager.addArtist("456", "Squarepusher")
     }
 }
 

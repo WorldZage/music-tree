@@ -66,12 +66,11 @@ void ArtistService::onDiscogsDataReady(const Artist& artist) {
 }
 
 void ArtistService::onArtistFound(const Artist& artist) {
+    if (m_session.containsArtistId(artist.id)) {
+        return;
+    }
 
-    // TODO: Change to handle this in artistFound.
-    // as well as findCollab call.
-    m_currentUIArtistIds.push_back(artist.id);
-    qDebug() << "current UI artists:" << m_currentUIArtistIds;
-
+    m_session.addArtist(artist.id,artist.name);
     // Find collaborations (TODO: with currently displayed artists)
     QMap<QString, std::vector<QString>> collabs;
     collabs = m_db.getAllCollaborations(artist.id);

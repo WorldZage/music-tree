@@ -1,7 +1,9 @@
 #include "sessionartistmodel.h"
 
-SessionArtistModel::SessionArtistModel(SessionManager* session, QObject* parent)
-    : QAbstractListModel(parent), m_session(session) {
+SessionArtistModel::SessionArtistModel(ArtistService* artistService, QObject* parent)
+    : QAbstractListModel(parent) {
+
+    m_session = &(artistService->m_session);
 
     connect(m_session, &SessionManager::artistAdded, this, [=](const SessionArtist&){
         int newRow = m_session->artists().size() - 1;
@@ -27,7 +29,12 @@ QVariant SessionArtistModel::data(const QModelIndex& index, int role) const {
 
     const auto& sessionArtist = m_session->artists().at(index.row());
     if (role == ArtistNameRole) return sessionArtist.name;
+    if (role == ArtistIdRole) return sessionArtist.id;
     return QVariant();
+}
+
+void SessionArtistModel::removeSessionArtistByListIndex(const int listIndex) {
+    m_session->removeArtistByListIndex(listIndex);
 }
 
 /*QHash<int, QByteArray> SessionArtistModel::roleNames() const {

@@ -4,14 +4,16 @@
 
 #include <QMetaEnum>
 #include "sessionmanager.h"
+#include "artistservice.h"
+
 
 class SessionArtistModel : public QAbstractListModel {
     Q_OBJECT
 public:
-    explicit SessionArtistModel(SessionManager* session, QObject* parent = nullptr);
+    explicit SessionArtistModel(ArtistService* artistService, QObject* parent = nullptr);
 
     //enum Roles { IdRole = Qt::UserRole + 1, NameRole };
-    enum Roles { ArtistNameRole = Qt::UserRole + 1 };
+    enum Roles { ArtistIdRole = Qt::UserRole + 1, ArtistNameRole};
     Q_ENUM(Roles);
 
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
@@ -19,8 +21,11 @@ public:
 
     //QHash<int, QByteArray> roleNames() const override;
     QHash<int, QByteArray> roleNames() const override {
-        return { {ArtistNameRole, "artistName"} };
+        return { {ArtistIdRole, "artistId"}, {ArtistNameRole, "artistName"}};
     }
+
+    Q_INVOKABLE void removeSessionArtistByListIndex(const int listIndex);
+
 private:
     SessionManager* m_session;
 };

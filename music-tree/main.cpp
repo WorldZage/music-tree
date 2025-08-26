@@ -19,19 +19,17 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     QQmlApplicationEngine engine;
 
-    // Core managers
-    SessionManager sessionManager = SessionManager();
-    engine.rootContext()->setContextProperty("sessionManager", &sessionManager);
-    SessionArtistModel sessionArtistModel = SessionArtistModel(&sessionManager);
-    engine.rootContext()->setContextProperty("sessionArtistModel", &sessionArtistModel);
-
-
-    // Facade service
+    // Core manager & Facade service
     ArtistService artistService = ArtistService();
     engine.rootContext()->setContextProperty("artistService", &artistService);
 
     // Register GraphViewWidget so we can create it from QML
     qmlRegisterType<GraphViewItem>("appmusictree", 1, 0, "GraphView");
+
+    // UI elements:
+    SessionArtistModel sessionArtistModel = SessionArtistModel(&artistService);
+    engine.rootContext()->setContextProperty("sessionArtistModel", &sessionArtistModel);
+
 
 
 
