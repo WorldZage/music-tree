@@ -126,5 +126,7 @@ CMakeLists.txt.user*
 .uic/
 /music-tree/build*/
 /build*/
-music-tree-config.ini
 
+# App-specific files
+music-tree-config.ini
+music-tree/music-tree.db
