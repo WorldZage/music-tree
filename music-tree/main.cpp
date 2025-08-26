@@ -20,6 +20,10 @@ int main(int argc, char *argv[])
     QQmlApplicationEngine engine;
 
     // Core managers
+    SessionManager sessionManager = SessionManager();
+    engine.rootContext()->setContextProperty("sessionManager", &sessionManager);
+    SessionArtistModel sessionArtistModel = SessionArtistModel(&sessionManager);
+    engine.rootContext()->setContextProperty("sessionArtistModel", &sessionArtistModel);
 
 
     // Facade service
