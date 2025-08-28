@@ -7,6 +7,7 @@
 #include "artist.h"
 #include "discogsmanager.h"
 #include "databasemanager.h"
+#include "sessionmanager.h"
 
 
 class ArtistService : public QObject{
@@ -15,10 +16,22 @@ class ArtistService : public QObject{
 public:
     explicit ArtistService(QObject* parent = nullptr);
 
-    Q_INVOKABLE void clearDb(void);
-
     // Entry point for UI: searches for an artist by name
     Q_INVOKABLE void searchByName(const QString& name);
+    Q_INVOKABLE void clearDb(void);
+
+    // TODO: Consider if these should be accessible through ArtistService or not:
+    SessionManager *sessionManager() {
+        return &m_session;
+    }
+    const QVector<Artist>& sessionArtists() const {
+        return m_session.artists();
+    }
+    const SessionCollaborations& collabs() const {
+        return m_session.collabs();
+    }
+
+
 
 signals:
     void artistFound(const Artist& artist);                     // UI list update
@@ -41,6 +54,5 @@ private:
 private:
     DiscogsManager m_discogs = DiscogsManager();
     DatabaseManager m_db = DatabaseManager();
-
-    std::vector<QString> m_currentUIArtistIds; // track currently displayed artists
+    SessionManager m_session = SessionManager();
 };

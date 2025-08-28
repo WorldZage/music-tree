@@ -19,15 +19,17 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
     QQmlApplicationEngine engine;
 
-    // Core managers
-
-
-    // Facade service
+    // Core manager & Facade service
     ArtistService artistService = ArtistService();
     engine.rootContext()->setContextProperty("artistService", &artistService);
 
     // Register GraphViewWidget so we can create it from QML
     qmlRegisterType<GraphViewItem>("appmusictree", 1, 0, "GraphView");
+
+    // UI elements:
+    SessionArtistModel sessionArtistModel = SessionArtistModel(&artistService);
+    engine.rootContext()->setContextProperty("sessionArtistModel", &sessionArtistModel);
+
 
 
 
@@ -49,18 +51,10 @@ int main(int argc, char *argv[])
         qWarning() << "GraphViewItem not found!";
     }
     else {
+        // TODO: getter for ArtistService::m_session;
+        graph->setArtistService(&(artistService));
         // (Optional) connect service signals to graph, if we expose such from ArtistService
         // Future feature, If ArtistService later emits an artistLoaded signal
-        /*
-        QObject::connect(&discogs, &DiscogsManager::artistAdded,
-                         graph, [graph](const QString &name, const QStringList &collabs){
-                             graph->addArtistNode(name);
-                             for (const QString &c : collabs) {
-                                 graph->addCollaboration({name, c});
-                             }
-                             graph->finalizeGraphLayout();
-                         });
-        */
     }
 
 

@@ -1,4 +1,5 @@
 #pragma once
+#include <QObject>
 #include <QQuickPaintedItem>
 #include <QQuickPaintedItem>
 #include <QTimer>
@@ -9,16 +10,14 @@
 #include <QPair>
 #include <QString>
 #include <QRandomGenerator>
+#include "sessionmanager.h"
+#include "artistservice.h"
 
 struct ArtistNode {
+    // TODO: SessionArtist artist;
     QString name;
     QPointF pos;
     QPointF velocity;
-};
-
-struct Edge {
-    int a, b;
-    int sharedCount;
 };
 
 class GraphViewItem : public QQuickPaintedItem {
@@ -27,25 +26,29 @@ class GraphViewItem : public QQuickPaintedItem {
 public:
     explicit GraphViewItem(QQuickItem *parent = nullptr);
     void paint(QPainter *painter) override;
-
-    Q_INVOKABLE void addArtistNode(const QString &name);
-    Q_INVOKABLE void addCollaboration(const QStringList &artistNames);
-    Q_INVOKABLE void finalizeGraphLayout();
-
+    void setArtistService(ArtistService *artistService);
 
 private slots:
     void updateLayout();
 
 private:
-    QVector<ArtistNode> nodes;
-    QVector<Edge> edges;
-    QMap<QString, int> artistIndex;
-    QMap<QPair<int, int>, int> collaborationCount;
+    void connectSessionEvents(const SessionManager *sessionManager);
+    void addArtistNode(const Artist& sessionArtist);
+    void removeArtistNode(const Artist& sessionArtist);
+    void finalizeGraphLayout();
+
+
+    QMap<QString, ArtistNode> nodeData; // artistId as key.
+    //QMap<QString, int> artistIndex;
+    //QMap<QPair<int, int>, int> collaborationCount;
 
     QTimer timer;
     double repulsion = 2000.0;
     double springLength = 100.0;
     double springStrength = 0.01;
     double nodeRadius = 20.0;
+    double boundaryThreshold = 30.0;
+
+    ArtistService* m_artistService;
 
 };
