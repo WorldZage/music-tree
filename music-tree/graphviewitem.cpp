@@ -7,6 +7,16 @@ GraphViewItem::GraphViewItem(QQuickItem *parent)
     setRenderTarget(QQuickPaintedItem::FramebufferObject); // better perf
     setAntialiasing(true);
 
+    // setAcceptedMouseButtons(Qt::LeftButton | Qt::RightButton);
+    setAcceptedMouseButtons(Qt::AllButtons); // allow clicks
+    setAcceptHoverEvents(true);   // For hover without buttons
+    setFlag(ItemHasContents, true);
+    setFlag(ItemAcceptsInputMethod, true);
+    setFlag(ItemIsFocusScope, true); // optional, sometimes needed for key/mouse combo
+    setAcceptTouchEvents(true);
+    setKeepMouseGrab(true);
+
+
     connect(&timer, &QTimer::timeout, this, &GraphViewItem::updateLayout);
     timer.start(30); // ~33 FPS
 }
@@ -46,17 +56,6 @@ void GraphViewItem::finalizeGraphLayout() {
             ++it;
         }
     }
-    /*
-    edges.clear();
-    edges.reserve(collaborationCount.size());
-    for (auto it = collaborationCount.begin(); it != collaborationCount.end(); ++it) {
-        Edge e;
-        e.a = it.key().first;
-        e.b = it.key().second;
-        e.sharedCount = it.value();
-        edges.push_back(e);
-    }
-    */
 }
 
 
@@ -93,13 +92,15 @@ void GraphViewItem::updateLayout() {
     const double h = height();
 
     // Integrate + damping
-    for (auto &n : nodeData) {
-        n.pos += n.velocity;
-        n.velocity *= 0.85;
+    for (auto [nKey, node] : nodeData.asKeyValueRange()) {
+        if (ui.mode == UiContext::Mode::DraggingNode && nKey == ui.activeNodeId)
+            continue; // skip layout forces for this node
+        node.pos += node.velocity;
+        node.velocity *= 0.85;
 
         // Constrain nodes fully inside the QML box
-        n.pos.setX(std::clamp(n.pos.x(), nodeRadius + boundaryThreshold, w - (nodeRadius + boundaryThreshold)));
-        n.pos.setY(std::clamp(n.pos.y(), nodeRadius + boundaryThreshold, h - (nodeRadius + boundaryThreshold)));
+        node.pos.setX(std::clamp(node.pos.x(), nodeRadius + boundaryThreshold, w - (nodeRadius + boundaryThreshold)));
+        node.pos.setY(std::clamp(node.pos.y(), nodeRadius + boundaryThreshold, h - (nodeRadius + boundaryThreshold)));
     }
 
     update(); // trigger repaint
@@ -150,6 +151,97 @@ void GraphViewItem::connectSessionEvents(const SessionManager *sessionManager) {
 
 }
 
+// ###
+// Mouse events:
+// ###
 
+bool GraphViewItem::event(QEvent *ev)
+{
+    switch (ev->type()) {
+    case QEvent::MouseButtonPress: {
+        auto *me = static_cast<QMouseEvent*>(ev);
+        qDebug() << "Mouse press at" << me->pos();
+        mousePressEvent(me);
+        return true; // consume event
+    }
+    case QEvent::MouseMove: {
+        auto *me = static_cast<QMouseEvent*>(ev);
+        qDebug() << "Mouse move at" << me->pos();
+        mouseMoveEvent(me);
+        return true;
+    }
+    case QEvent::MouseButtonRelease: {
+        auto *me = static_cast<QMouseEvent*>(ev);
+        qDebug() << "Mouse release at" << me->pos();
+        mouseReleaseEvent(me);
+        return true;
+    }
+
+    default:
+        break;
+    }
+
+    // Fallback to base implementation for unhandled events
+    return QQuickPaintedItem::event(ev);
+}
+
+
+void GraphViewItem::mousePressEvent(QMouseEvent *event) {
+    event->accept();
+
+    QString hitId = hitTestNode(event->pos());
+    if (!hitId.isEmpty() && event->button() == Qt::LeftButton) {
+        // Start dragging
+        ui.mode = UiContext::Mode::DraggingNode;
+        ui.activeNodeId = hitId;
+        ui.dragStartPos = event->position();
+        ui.dragOffset = nodeData[hitId].pos - event->position(); // anchor offset
+        qDebug() << "Dragging node started:" << hitId;
+    } else if (!hitId.isEmpty() && event->button() == Qt::RightButton) {
+        // Right click, future context menu
+        qDebug() << "Right-clicked node:" << hitId;
+    }
+}
+
+void GraphViewItem::mouseMoveEvent(QMouseEvent *event) {
+    event->accept();
+
+    if (ui.mode == UiContext::Mode::DraggingNode && !ui.activeNodeId.isEmpty()) {
+        // Move node relative to original drag offset
+        QPointF newPos = event->position() + ui.dragOffset;
+
+        // Constrain node within widget bounds
+        const double w = width();
+        const double h = height();
+        newPos.setX(std::clamp(newPos.x(), nodeRadius + boundaryThreshold, w - nodeRadius - boundaryThreshold));
+        newPos.setY(std::clamp(newPos.y(), nodeRadius + boundaryThreshold, h - nodeRadius - boundaryThreshold));
+
+        nodeData[ui.activeNodeId].pos = newPos;
+        nodeData[ui.activeNodeId].velocity = QPointF(0, 0); // stop passive-layout fighting
+        update(); // trigger repaint
+    }
+}
+
+void GraphViewItem::mouseReleaseEvent(QMouseEvent *event) {
+    event->accept();
+
+    if (ui.mode == UiContext::Mode::DraggingNode && event->button() == Qt::LeftButton) {
+        qDebug() << "Dragging node ended:" << ui.activeNodeId;
+    }
+    ui.activeNodeId.clear();
+    ui.mode = UiContext::Mode::None;
+}
+
+
+QString GraphViewItem::hitTestNode(const QPointF &pos) const {
+    for (auto it = nodeData.begin(); it != nodeData.end(); ++it) {
+        double dx = pos.x() - it.value().pos.x();
+        double dy = pos.y() - it.value().pos.y();
+        if (std::hypot(dx, dy) <= nodeRadius) {
+            return it.key(); // return artistId
+        }
+    }
+    return {};
+}
 
 

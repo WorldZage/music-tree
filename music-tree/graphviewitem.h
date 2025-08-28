@@ -20,6 +20,24 @@ struct ArtistNode {
     QPointF velocity;
 };
 
+
+
+struct UiContext {
+    enum class Mode {
+        None,
+        DraggingNode,
+        PanningView,
+        SelectingArea,
+        ContextMenu
+    };
+
+    Mode mode = Mode::None;
+    QString activeNodeId;
+    QPointF dragStartPos;
+    QPointF dragOffset;
+};
+
+
 class GraphViewItem : public QQuickPaintedItem {
     Q_OBJECT
 
@@ -37,10 +55,15 @@ private:
     void removeArtistNode(const Artist& sessionArtist);
     void finalizeGraphLayout();
 
+    // mouse events:
+    bool event(QEvent *ev) override;
+    QString hitTestNode(const QPointF &pos) const;
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
 
     QMap<QString, ArtistNode> nodeData; // artistId as key.
-    //QMap<QString, int> artistIndex;
-    //QMap<QPair<int, int>, int> collaborationCount;
+
 
     QTimer timer;
     double repulsion = 2000.0;
@@ -50,5 +73,7 @@ private:
     double boundaryThreshold = 30.0;
 
     ArtistService* m_artistService;
+
+    UiContext ui;
 
 };
