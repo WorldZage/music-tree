@@ -34,12 +34,10 @@ public:
     // Look up artist by ID
     std::optional<Artist> findArtistById(const QString& artistId) const;
 
-    // Look up artist by name
-    std::optional<Artist> findArtistByName(const QString& name) const;
+    std::vector<ReleaseInfo> getReleasesForArtist(const QString& artistId) const;
 
     // Save or update artist in DB
     void saveArtist(const Artist& artist);
-
     void saveReleases(const QString& artistId, const std::vector<ReleaseInfo>& releases);
 
 
@@ -52,9 +50,6 @@ public:
     // Clear all data
     void clear();
 
-    std::vector<QString> findCollaborations(const QString& artistId1, const QString& artistId2) const;
-
-    QMap<QString, std::vector<QString>> getAllCollaborations(const QString& artistId) const;
 
 
 
@@ -64,4 +59,9 @@ private:
 
     // Initialization helpers
     bool initializeSchema();
+
+    // TODO: Consider removing:
+    std::vector<QString> findCollaborations(const QString& artistId1, const QString& artistId2) const;
+    QMap<QString, std::vector<QString>> getAllCollaborations(const QString& artistId) const;
+    std::optional<Artist> findArtistByName(const QString& name) const;
 };

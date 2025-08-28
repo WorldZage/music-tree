@@ -17,29 +17,34 @@ ApplicationWindow {
 
         // Left panel
         ColumnLayout {
-            Layout.fillWidth: true
+            width: SplitView.view ? SplitView.width : 0
+            //Layout.fillWidth: true
             Layout.fillHeight: true
 
             TextField {
                 id: searchField
+                width: parent.width / 4
                 placeholderText: "Enter artist name..."
                 onAccepted: if (text.trim() !== "") artistService.searchByName(text.trim())
             }
 
             RowLayout {
+                width: parent.width
                 Button {
+                    width: parent.width / 8
                     text: "Search"
                     onClicked: if (searchField.text.trim() !== "") artistService.searchByName(searchField.text.trim())
                 }
 
                 Button {
+                    width: parent.width / 8
                     text: "Clear DB"
                     onClicked: artistService.clearDb()
                 }
             }
 
             Rectangle {
-                Layout.preferredWidth: 300
+                Layout.preferredWidth: parent.width
                 Layout.fillHeight: true
                 color: "white"
                 GraphView {

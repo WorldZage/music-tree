@@ -66,22 +66,48 @@ void ArtistService::onDiscogsDataReady(const Artist& artist) {
 }
 
 void ArtistService::onArtistFound(const Artist& artist) {
-    if (m_session.containsArtistId(artist.id)) {
+    if (m_session.containsArtist(artist)) {
         return;
     }
-
-    m_session.addArtist(artist.id,artist.name);
+    m_session.addArtist(artist);
     // Find collaborations (TODO: with currently displayed artists)
-    QMap<QString, std::vector<QString>> collabs;
-    collabs = m_db.getAllCollaborations(artist.id);
+
+  ; // placeholder
+    /* for context, this is the data type of m_sesison.artists:
+     *  struct SessionArtist {
+    QString id;    // Discogs ID
+    QString name;  // Artist name
+};
+using SessionArtists = QVector<SessionArtist>;
+
+
+Keep in mind, it's different from the Artist data type:
+struct Artist {
+    QString id;
+    QString name;
+    QString profile;
+    QString resourceUrl;
+    std::vector<ReleaseInfo> releases;
+};
+// Which is something we should likely redesign (later), since its confusing.
+     *
+     */
+
+}
+/*
+    //QMap<QString, std::vector<QString>> collabs;
+    //collabs = m_db.getAllCollaborations(artist.id);
     /*
     for (const auto& otherId : m_currentUIArtistIds) {
         auto rels = m_db.findCollaborations(artist.id, otherId);
         if (!rels.empty()) collabs[otherId] = rels;
-    }*/
-    emit collaborationsReady(collabs);
-    qDebug() << "collabs:" << collabs;
-}
+    }
+
+emit collaborationsReady(collabs);
+qDebug() << "collabs:" << collabs;
+ */
+
+
 
 
 // Public: list cached artists

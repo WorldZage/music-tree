@@ -3,15 +3,15 @@
 SessionArtistModel::SessionArtistModel(ArtistService* artistService, QObject* parent)
     : QAbstractListModel(parent) {
 
-    m_session = &(artistService->m_session);
+    m_session = (artistService->sessionManager());
 
-    connect(m_session, &SessionManager::artistAdded, this, [=](const SessionArtist&){
+    connect(m_session, &SessionManager::artistAdded, this, [=](const Artist&){
         int newRow = m_session->artists().size() - 1;
         beginInsertRows(QModelIndex(), newRow, newRow);
         endInsertRows();
     });
 
-    connect(m_session, &SessionManager::artistRemoved, this, [=](const QString&){
+    connect(m_session, &SessionManager::artistRemoved, this, [=](const Artist&){
         beginResetModel(); endResetModel(); // simple but works
     });
     connect(m_session, &SessionManager::sessionCleared, this, [=](){

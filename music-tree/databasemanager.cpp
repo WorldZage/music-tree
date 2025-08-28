@@ -94,7 +94,7 @@ QSqlDatabase DatabaseManager::getThreadConnection() {
 std::optional<Artist> DatabaseManager::findArtistById(const QString& artistId) const {
     QSqlDatabase db = getThreadConnection();
     QSqlQuery query(db);
-    query.prepare("SELECT id, name FROM artists WHERE id = :id");
+    query.prepare("SELECT id, name, profile, resource_url FROM artists WHERE id = :id");
     query.bindValue(":id", artistId);
 
     if (!query.exec()) {
@@ -106,6 +106,11 @@ std::optional<Artist> DatabaseManager::findArtistById(const QString& artistId) c
         Artist artist;
         artist.id = query.value(0).toString();
         artist.name = query.value(1).toString();
+        artist.profile = query.value(2).toString();
+        artist.resourceUrl = query.value(3).toString();
+
+        artist.releases = getReleasesForArtist(artist.id); // populate releases
+
         return artist;
     }
     return std::nullopt;
@@ -117,7 +122,7 @@ std::optional<Artist> DatabaseManager::findArtistById(const QString& artistId) c
 std::optional<Artist> DatabaseManager::findArtistByName(const QString& name) const {
     QSqlDatabase db = getThreadConnection();
     QSqlQuery query(db);
-    query.prepare("SELECT id, name FROM artists WHERE name = :name");
+    query.prepare("SELECT id, name, profile, resource_url FROM artists WHERE name = :name");
     query.bindValue(":name", name);
 
     if (!query.exec()) {
@@ -129,10 +134,54 @@ std::optional<Artist> DatabaseManager::findArtistByName(const QString& name) con
         Artist artist;
         artist.id = query.value(0).toString();
         artist.name = query.value(1).toString();
+        artist.profile = query.value(2).toString();
+        artist.resourceUrl = query.value(3).toString();
+
+        artist.releases = getReleasesForArtist(artist.id); // populate releases
         return artist;
     }
     return std::nullopt;
 }
+
+// -----------------------------
+// Helper: fetch releases for a given artist ID
+// -----------------------------
+std::vector<ReleaseInfo> DatabaseManager::getReleasesForArtist(const QString& artistId) const {
+    std::vector<ReleaseInfo> releases;
+
+    QSqlDatabase db = getThreadConnection();
+    QSqlQuery query(db);
+
+    query.prepare(R"(
+        SELECT r.id, r.title, r.year, r.country, r.genre, r.style, r.resource_url, r.data_quality, ra.role
+        FROM releases r
+        JOIN release_artists ra ON r.id = ra.release_id
+        WHERE ra.artist_id = :artistId
+    )");
+    query.bindValue(":artistId", artistId);
+
+    if (!query.exec()) {
+        qWarning() << "getReleasesForArtist failed:" << query.lastError().text();
+        return releases;
+    }
+
+    while (query.next()) {
+        ReleaseInfo info;
+        info.id = query.value(0).toString();
+        info.title = query.value(1).toString();
+        info.year = query.value(2).toInt();
+        info.country = query.value(3).toString();
+        info.genre = query.value(4).toString();
+        info.style = query.value(5).toString();
+        info.resourceUrl = query.value(6).toString();
+        info.dataQuality = query.value(7).toString();
+        info.role = query.value(8).toString();
+        releases.push_back(info);
+    }
+
+    return releases;
+}
+
 
 // -----------------------------
 // Insert or update

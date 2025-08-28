@@ -3,33 +3,38 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include "artist.h"
 
-struct SessionArtist {
-    QString id;    // Discogs ID
-    QString name;  // Artist name
-};
+
+
 
 class SessionManager : public QObject {
     Q_OBJECT
 public:
-    explicit SessionManager(QObject* parent = nullptr);
+    SessionManager(QObject* parent = nullptr);
 
-    const QVector<SessionArtist>& artists() const { return m_artists; }
+    const QVector<Artist>& artists() const { return m_artists; }
+    const SessionCollaborations& collabs() const { return m_collabs; }
 
-    void addArtist(const SessionArtist& artist);
-    void addArtist(const QString& artistName, const QString& artistId);
-    void removeArtist(const QString& artistId);
+    void addArtist(const Artist& artist);
+
+
     void removeArtistByListIndex(const int listIndex);
-    bool containsArtistId(const QString& artistId);
+    bool containsArtist(const Artist& artist);
 
 
     void clear();
 
 signals:
-    void artistAdded(const SessionArtist& artist);
-    void artistRemoved(const QString& artistId);
+    void artistAdded(const Artist& artist);
+    void artistRemoved(const Artist& artist);
     void sessionCleared();
 
 private:
-    QVector<SessionArtist> m_artists;
+    void removeArtistById(const QString& artistId);
+    void updateCollabsForNewArtist(const Artist& newArtist);
+    void removeCollabsForArtist(const QString& artistId);
+
+    QVector<Artist> m_artists;
+    SessionCollaborations m_collabs;
 };

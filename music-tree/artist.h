@@ -22,8 +22,6 @@ struct ReleaseInfo {
 };
 
 
-
-
 struct Artist {
     QString id;
     QString name;
@@ -31,6 +29,32 @@ struct Artist {
     QString resourceUrl;
     std::vector<ReleaseInfo> releases;
 };
+
+
+struct CollabKey {
+    QString a, b;
+
+    CollabKey(const QString& id1, const QString& id2) {
+        if (id1 < id2) { a = id1; b = id2; }
+        else           { a = id2; b = id1; }
+    }
+
+    bool operator==(const CollabKey& other) const {
+        return a == other.a && b == other.b;
+    }
+};
+
+struct CollabKeyHash {
+    std::size_t operator()(const CollabKey& k) const {
+        return qHash(k.a) ^ (qHash(k.b) << 1);
+    }
+};
+
+using ArtistCollaboration = QVector<QString>; // list of shared releases
+
+using SessionCollaborations = std::unordered_map<CollabKey, ArtistCollaboration, CollabKeyHash>;
+
+
 
 // Declare operators here
 QDebug operator<<(QDebug dbg, const ReleaseInfo &r);
