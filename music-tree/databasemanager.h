@@ -1,7 +1,6 @@
 #pragma once
 
 #include <QString>
-//#include <QSql>
 #include <QCoreApplication>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -13,9 +12,11 @@
 #include <QString>
 #include <QThread>
 #include <QFile>
+#include <QStandardPaths>
 
 #include <optional>
 #include <vector>
+
 
 
 #include "artist.h"

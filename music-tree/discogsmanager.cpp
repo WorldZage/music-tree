@@ -7,12 +7,22 @@ DiscogsManager::DiscogsManager(QObject *parent)
     //connect(&m_networkManager, &QNetworkAccessManager::finished,
     //        this, &DiscogsManager::onNetworkReply);
 
+    QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
 
+    // Ensure directory exists
+    QDir().mkpath(configDir);
+
+    QString iniPath = QDir(configDir).filePath("music-tree-config.ini");
+
+    QSettings settings(iniPath, QSettings::IniFormat);
+    m_pat_token = settings.value("discogs/token").toString();
+
+    /*
     QString iniPath = QCoreApplication::applicationDirPath() +
                       "/../../../music-tree-config.ini";
     QSettings settings(iniPath, QSettings::IniFormat);
     m_pat_token = settings.value("discogs/token").toString();
-
+    */
 }
 
 

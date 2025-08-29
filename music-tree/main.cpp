@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
         []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
 
-    engine.loadFromModule("music-tree", "Main");
+    engine.loadFromModule("music_tree", "Main");
     if (engine.rootObjects().isEmpty()) return -1;
 
 

@@ -5,15 +5,23 @@ static QString g_dbPath; // global DB path for thread-local connections
 
 
 DatabaseManager::DatabaseManager() {
+
+    QString dbDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(dbDir);
+
+    QString dbFileName = "music-tree.db";
+    m_dbPath = QDir(dbDir).filePath(dbFileName);
+/*
     // Database lives in the app root
     QCoreApplication::applicationFilePath();
     QDir appDir((QCoreApplication::applicationDirPath()));
     QString toAppRoot = "../../";
 
     QString dbFileName = toAppRoot+"music-tree.db";
-    QString schemaFileName = toAppRoot+"resources/"+"schema.sql";
+    // QString schemaFileName = toAppRoot+"resources/"+"schema.sql";
     m_dbPath = QDir(appDir).filePath(dbFileName);
-    m_schemaPath = appDir.filePath(schemaFileName);
+*/
+    m_schemaPath = ":/resources/schema.sql";// appDir.filePath(schemaFileName);
 
     g_dbPath = m_dbPath; // set global DB path for thread-local connections
 
@@ -43,11 +51,11 @@ bool DatabaseManager::initializeSchema() {
 
     if (!check.next()) {
         QFile schemaFile(m_schemaPath);
+
         if (!schemaFile.open(QIODevice::ReadOnly)) {
             qWarning() << "Failed to open schema resource file:" << m_schemaPath;
             return false;
         }
-
         QString schema = schemaFile.readAll();
         schemaFile.close();
 

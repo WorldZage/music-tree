@@ -129,4 +129,4 @@ CMakeLists.txt.user*
 
 # App-specific files
 music-tree-config.ini
-music-tree/music-tree.db
+*music-tree.db
