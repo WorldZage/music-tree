@@ -73,9 +73,10 @@ The file must be placed in the standard Qt App configuration directory for your 
 "~/.config/appmusic\_tree" or "/etc/xdg/appmusic\_tree"
 
 The file must have with the following structure:
+```
 [discogs]
 token=<Personal access token>
-
+```
 The application will read this file at runtime.
 
 ### 3. Database
