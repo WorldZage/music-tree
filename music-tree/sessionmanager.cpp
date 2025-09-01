@@ -15,10 +15,16 @@ void SessionManager::loadArtistsFromFile() {
 }
 
 void SessionManager::addArtist(const Artist& artist) {
-    m_artists.append(artist);
-    emit artistAdded(artist);
+    if (containsArtist(artist)) {
+        qDebug() << "Artist already exists:" << artist.name;
+        return;
+    }
 
+    m_artists.append(artist);
+    registerArtistReleases(artist);
     updateCollabsForNewArtist(artist);
+
+    emit artistAdded(artist);
 }
 
 void SessionManager::removeArtistByListIndex(const int listIndex) {
@@ -38,18 +44,9 @@ void SessionManager::removeArtistById(const QString& artistId) {
     QMutableVectorIterator<Artist> it(m_artists);
     while (it.hasNext()) {
         if (it.next().id == artistId) {
+            unregisterArtistReleases(it.value());
             const Artist removed = it.value();  // snapshot before remove()
             it.remove();                        // safe; iterator now before the next item
-
-            // Scan ahead for further duplicates of the *same* id
-            QMutableVectorIterator<Artist> dupIt = it; // copy starting at current position
-            while (dupIt.hasNext()) {
-                if (dupIt.next().id == artistId) {
-                    qWarning() << "Duplicate artist with id" << artistId
-                               << "still present after first removal!";
-                    break;
-                }
-            }
 
             emit artistRemoved(removed);
             return;
@@ -70,34 +67,41 @@ void SessionManager::removeCollabsForArtist(const QString& artistId) {
 }
 
 bool SessionManager::containsArtist(const Artist& artist) {
-    auto it = std::find_if(m_artists.begin(), m_artists.end(), [&](const Artist& a){ return a.id == artist.id; });
-    return (it != m_artists.end());
+    for (const Artist& a : std::as_const(m_artists)) {
+        if (a.id == artist.id) return true;
+    }
+    return false;
+}
+
+void SessionManager::registerArtistReleases(const Artist& artist) {
+    for (const ReleaseInfo& r : artist.releases) {
+        m_releaseToArtists.insert(r.id, artist.id);
+    }
+}
+
+void SessionManager::unregisterArtistReleases(const Artist& artist) {
+    for (const ReleaseInfo& r : artist.releases) {
+        m_releaseToArtists.remove(r.id, artist.id);
+    }
+}
+
+// Debug/query: who owns a release?
+QVector<QString> SessionManager::getArtistsForRelease(const QString& releaseId) const {
+    return m_releaseToArtists.values(releaseId).toVector();
 }
 
 
 void SessionManager::updateCollabsForNewArtist(const Artist& newArtist) {
-    // Iterate existing session artists
-    for (const Artist& existing : std::as_const(m_artists)) {
-        if (existing.id == newArtist.id) continue;
+    for (const ReleaseInfo& rel : newArtist.releases) {
+        const auto others = m_releaseToArtists.values(rel.id);
+        for (const QString& otherId : others) {
+            if (otherId == newArtist.id) continue;
 
-        // Find overlapping releases
-        QVector<QString> shared;
-        for (const ReleaseInfo& relNew : newArtist.releases) {
-            for (const ReleaseInfo& relExisting : existing.releases) {
-                if (relNew.id == relExisting.id) {
-                    shared.append(relNew.id);
-                    qDebug() << "Release match: " << relNew.title << "; with: " << existing.name;
-                }
-            }
-        }
-
-        if (!shared.isEmpty()) {
-            CollabKey key(newArtist.id, existing.id);
+            CollabKey key(newArtist.id, otherId);
             ArtistCollaboration& collab = m_collabs[key]; // inserts if missing
-            for (const QString& r : shared) {
-                if (!collab.contains(r)) {
-                    collab.append(r);
-                }
+            if (!collab.contains(rel.id)) {
+                collab.append(rel.id);
+                qDebug() << "Release match:" << rel.title << "; with artistId:" << otherId;
             }
         }
     }

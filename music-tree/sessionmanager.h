@@ -24,7 +24,10 @@ public:
     void removeArtistByListIndex(const int listIndex);
     bool containsArtist(const Artist& artist);
 
+
     Q_INVOKABLE void loadArtistsFromFile(void);
+    // debugging / queries
+    QVector<QString> getArtistsForRelease(const QString& releaseId) const;
 
     void clear();
 
@@ -35,9 +38,15 @@ signals:
 
 private:
     void removeArtistById(const QString& artistId);
+
     void updateCollabsForNewArtist(const Artist& newArtist);
     void removeCollabsForArtist(const QString& artistId);
 
+    void registerArtistReleases(const Artist& artist);
+    void unregisterArtistReleases(const Artist& artist);
+
+
     QVector<Artist> m_artists;
     SessionCollaborations m_collabs;
+    QMultiHash<QString, QString> m_releaseToArtists;  // releaseId -> artistId(s)
 };

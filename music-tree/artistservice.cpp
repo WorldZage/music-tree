@@ -66,9 +66,6 @@ void ArtistService::onDiscogsDataReady(const Artist& artist) {
 }
 
 void ArtistService::onArtistFound(const Artist& artist) {
-    if (m_session.containsArtist(artist)) {
-        return;
-    }
     m_session.addArtist(artist);
     // Find collaborations (TODO: with currently displayed artists)
 
