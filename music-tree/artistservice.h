@@ -20,6 +20,11 @@ public:
     Q_INVOKABLE void searchByName(const QString& name);
     Q_INVOKABLE void clearDb(void);
 
+
+    Q_INVOKABLE void loadArtistsFromFile() {
+        m_session.loadArtistsFromFile();
+    }
+
     // TODO: Consider if these should be accessible through ArtistService or not:
     SessionManager *sessionManager() {
         return &m_session;
@@ -30,6 +35,7 @@ public:
     const SessionCollaborations& collabs() const {
         return m_session.collabs();
     }
+
 
 
 
@@ -55,4 +61,5 @@ private:
     DiscogsManager m_discogs = DiscogsManager();
     DatabaseManager m_db = DatabaseManager();
     SessionManager m_session = SessionManager();
+
 };

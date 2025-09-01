@@ -1,8 +1,17 @@
 // SessionManager.cpp
 #include "sessionmanager.h"
-#include <QDebug>
+
 
 SessionManager::SessionManager(QObject* parent) : QObject(parent) {
+}
+
+
+void SessionManager::loadArtistsFromFile() {
+    QString fileName = QFileDialog::getOpenFileName(nullptr, tr("Open File"),
+                                                    "/home",
+                                                    tr("XML files (*.xml)"));
+    qDebug() << "selected file name: " << fileName;
+
 }
 
 void SessionManager::addArtist(const Artist& artist) {

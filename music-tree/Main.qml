@@ -41,6 +41,11 @@ ApplicationWindow {
                     text: "Clear DB"
                     onClicked: artistService.clearDb()
                 }
+                Button {
+                    width: parent.width / 8
+                    text: "Load Artists from file"
+                    onClicked: artistService.loadArtistsFromFile()
+                }
             }
 
             Rectangle {

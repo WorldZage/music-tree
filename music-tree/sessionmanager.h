@@ -3,6 +3,8 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <QDebug>
+#include <QFileDialog>
 #include "artist.h"
 
 
@@ -22,6 +24,7 @@ public:
     void removeArtistByListIndex(const int listIndex);
     bool containsArtist(const Artist& artist);
 
+    Q_INVOKABLE void loadArtistsFromFile(void);
 
     void clear();
 
