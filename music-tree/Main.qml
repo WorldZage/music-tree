@@ -17,7 +17,7 @@ ApplicationWindow {
 
         // Left panel
         ColumnLayout {
-            width: SplitView.view ? SplitView.width : 0
+            width: SplitView.view ? SplitView.width : 400
             //Layout.fillWidth: true
             Layout.fillHeight: true
 
@@ -41,11 +41,6 @@ ApplicationWindow {
                     text: "Clear DB"
                     onClicked: artistService.clearDb()
                 }
-                Button {
-                    width: parent.width / 8
-                    text: "Load Artists from file"
-                    onClicked: artistService.loadArtistsFromFile()
-                }
             }
 
             Rectangle {
@@ -58,35 +53,51 @@ ApplicationWindow {
                     width: parent.width * 0.7
                     height: parent.height * 0.7
                 }
-                Text {
-                    anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter; bottomMargin: 20 }
-                    text: "test"
-                }
             }
         }
-
-        // Right panel
-        ListView {
-            id: artistList
-            Layout.preferredWidth: 300
+        ColumnLayout {
+            width: SplitView.view ? SplitView.width : 400
+            //Layout.fillWidth: true
             Layout.fillHeight: true
-            model: sessionArtistModel
+            RowLayout {
+                width: parent.width
+                Button {
+                    width: parent.width / 8
+                    text: "Load Artists from file"
+                    onClicked: artistService.loadArtistsFromFile()
+                }
 
-            delegate: Rectangle {
-                width: ListView.view ? ListView.view.width : 0
-                height: 40
-                color: index % 2 ? "lightgrey" : "white"
+                Button {
+                    width: parent.width / 8
+                    text: "Save Artists to file"
+                    onClicked: artistService.saveArtistsToFile()
+                }
+            }
 
-                Row {
-                    spacing: 10
-                    Text { text: artistName + qsTr(" (") + artistId + qsTr(")")}
-                    Button {
-                        text: "Remove"
-                        onClicked: sessionArtistModel.removeSessionArtistByListIndex(index)
+            // Right panel
+            ListView {
+                id: artistList
+                Layout.preferredWidth: 300
+                Layout.fillHeight: true
+                model: sessionArtistModel
+
+                delegate: Rectangle {
+                    width: ListView.view ? ListView.view.width : 0
+                    height: 40
+                    color: index % 2 ? "lightgrey" : "white"
+
+                    Row {
+                        spacing: 10
+                        Text { text: artistName + qsTr(" (") + artistId + qsTr(")")}
+                        Button {
+                            text: "Remove"
+                            onClicked: sessionArtistModel.removeSessionArtistByListIndex(index)
+                        }
                     }
                 }
             }
         }
+
     }
 }
 

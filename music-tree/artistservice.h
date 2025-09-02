@@ -21,9 +21,8 @@ public:
     Q_INVOKABLE void clearDb(void);
 
 
-    Q_INVOKABLE void loadArtistsFromFile() {
-        m_session.loadArtistsFromFile();
-    }
+    Q_INVOKABLE void loadArtistsFromFile();
+    Q_INVOKABLE void saveArtistsToFile();
 
     // TODO: Consider if these should be accessible through ArtistService or not:
     SessionManager *sessionManager() {

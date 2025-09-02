@@ -47,7 +47,6 @@ void DiscogsManager::searchForArtistByName(const QString& name)
                              qWarning() << "No artists found for" << name;
                          }
                          emit discogsArtistSearchReady(artists);
-
     });
     // Start watching the search future
     searchWatcher->setFuture(fSearch);
@@ -106,7 +105,7 @@ QFuture<std::vector<Artist>> DiscogsManager::_helper_search(const QString& name)
         if (reply->error() == QNetworkReply::NoError) {
             QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
             QJsonArray results = doc.object()["results"].toArray();
-            for (const auto& val : results) {
+            for (const auto& val : std::as_const(results)) {
                 QJsonObject obj = val.toObject();
                 QString id = obj["id"].isString() ? obj["id"].toString()
                                                   : QString::number(static_cast<qint64>(obj["id"].toDouble()));
@@ -153,7 +152,6 @@ QFuture<std::optional<Artist>> DiscogsManager::_helper_fetchArtist(const QString
         artist.profile = obj["profile"].toString();
         artist.resourceUrl = obj["resource_url"].toString();
 
-        // If you want releases, fetch them next
         QString releasesUrl = obj["releases_url"].toString();
         if (!releasesUrl.isEmpty()) {
             _helper_fetchAllReleases(releasesUrl).then([p = std::move(p), artist](std::vector<ReleaseInfo> releases) mutable {

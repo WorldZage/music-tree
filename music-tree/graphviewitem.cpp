@@ -160,19 +160,19 @@ bool GraphViewItem::event(QEvent *ev)
     switch (ev->type()) {
     case QEvent::MouseButtonPress: {
         auto *me = static_cast<QMouseEvent*>(ev);
-        qDebug() << "Mouse press at" << me->pos();
+        // qDebug() << "Mouse press at" << me->pos();
         mousePressEvent(me);
         return true; // consume event
     }
     case QEvent::MouseMove: {
         auto *me = static_cast<QMouseEvent*>(ev);
-        qDebug() << "Mouse move at" << me->pos();
+        // qDebug() << "Mouse move at" << me->pos();
         mouseMoveEvent(me);
         return true;
     }
     case QEvent::MouseButtonRelease: {
         auto *me = static_cast<QMouseEvent*>(ev);
-        qDebug() << "Mouse release at" << me->pos();
+        // qDebug() << "Mouse release at" << me->pos();
         mouseReleaseEvent(me);
         return true;
     }
@@ -226,7 +226,7 @@ void GraphViewItem::mouseReleaseEvent(QMouseEvent *event) {
     event->accept();
 
     if (ui.mode == UiContext::Mode::DraggingNode && event->button() == Qt::LeftButton) {
-        qDebug() << "Dragging node ended:" << ui.activeNodeId;
+        // qDebug() << "Dragging node ended:" << ui.activeNodeId;
     }
     ui.activeNodeId.clear();
     ui.mode = UiContext::Mode::None;

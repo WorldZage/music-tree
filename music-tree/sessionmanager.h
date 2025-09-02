@@ -5,6 +5,7 @@
 #include <QVector>
 #include <QDebug>
 #include <QFileDialog>
+#include <QMutex>
 #include "artist.h"
 
 
@@ -24,8 +25,6 @@ public:
     void removeArtistByListIndex(const int listIndex);
     bool containsArtist(const Artist& artist);
 
-
-    Q_INVOKABLE void loadArtistsFromFile(void);
     // debugging / queries
     QVector<QString> getArtistsForRelease(const QString& releaseId) const;
 
@@ -49,4 +48,6 @@ private:
     QVector<Artist> m_artists;
     SessionCollaborations m_collabs;
     QMultiHash<QString, QString> m_releaseToArtists;  // releaseId -> artistId(s)
+
+    QMutex sessionMutex;
 };
