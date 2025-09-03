@@ -5,9 +5,8 @@ import QtQuick.Shapes
 import QtQml.XmlListModel
 import appmusictree 1.0
 
-
 ApplicationWindow {
-    width: 1000
+    width: 1200   // wider default
     height: 700
     visible: true
     title: "Music Tree"
@@ -17,29 +16,20 @@ ApplicationWindow {
 
         // Left panel
         ColumnLayout {
-            width: SplitView.view ? SplitView.width : 400
-            //Layout.fillWidth: true
+            width: SplitView.view ? SplitView.width : 1000
             Layout.fillHeight: true
-
-            TextField {
-                id: searchField
-                width: parent.width / 4
-                placeholderText: "Enter artist name..."
-                onAccepted: if (text.trim() !== "") artistService.searchByName(text.trim())
-            }
 
             RowLayout {
                 width: parent.width
+                TextField {
+                    id: searchField
+                    Layout.fillWidth: true
+                    placeholderText: "Enter artist name..."
+                    onAccepted: if (text.trim() !== "") artistService.searchByName(text.trim())
+                }
                 Button {
-                    width: parent.width / 8
                     text: "Search"
                     onClicked: if (searchField.text.trim() !== "") artistService.searchByName(searchField.text.trim())
-                }
-
-                Button {
-                    width: parent.width / 8
-                    text: "Clear DB"
-                    onClicked: artistService.clearDb()
                 }
             }
 
@@ -50,34 +40,37 @@ ApplicationWindow {
                 GraphView {
                     id: graph
                     objectName: "graph"
-                    width: parent.width * 0.7
+                    width: parent.width * 0.85   // larger default width
                     height: parent.height * 0.7
                 }
             }
         }
+
+        // Right panel
         ColumnLayout {
             width: SplitView.view ? SplitView.width : 400
-            //Layout.fillWidth: true
             Layout.fillHeight: true
+
+            Button {
+                text: "Clear DB"
+                onClicked: artistService.clearDb()
+            }
+
             RowLayout {
                 width: parent.width
                 Button {
-                    width: parent.width / 8
                     text: "Load Artists from file"
                     onClicked: artistService.loadArtistsFromFile()
                 }
-
                 Button {
-                    width: parent.width / 8
                     text: "Save Artists to file"
                     onClicked: artistService.saveArtistsToFile()
                 }
             }
 
-            // Right panel
             ListView {
                 id: artistList
-                Layout.preferredWidth: 300
+                Layout.preferredWidth: 350
                 Layout.fillHeight: true
                 model: sessionArtistModel
 
@@ -86,9 +79,25 @@ ApplicationWindow {
                     height: 40
                     color: index % 2 ? "lightgrey" : "white"
 
-                    Row {
+                    RowLayout {
+                        anchors.fill: parent
                         spacing: 10
-                        Text { text: artistName + qsTr(" (") + artistId + qsTr(")")}
+
+                        Text {
+                            text: artistName + qsTr(" (") + artistId + qsTr(")")
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
+                        }
+
+                        Button {
+                            text: "Refresh"
+                            onClicked: {
+                                // stub: implement later
+                                artistService.refreshArtist(artistName, artistId, index)
+                            }
+                        }
+
                         Button {
                             text: "Remove"
                             onClicked: sessionArtistModel.removeSessionArtistByListIndex(index)
@@ -97,7 +106,5 @@ ApplicationWindow {
                 }
             }
         }
-
     }
 }
-
