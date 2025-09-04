@@ -41,7 +41,7 @@ void ArtistService::onDiscogsArtistSearchReady(const std::vector<Artist>& artist
     // TODO: prompt UI selection of top artists found, displaying artist name and artist id.
     // for now, choose top result.
     Artist artist = artists.front();
-    // TODO: use the ID from discogs search, to check DB again.
+
     auto artistOpt = m_db.findArtistById(artist.id);
     if (artistOpt.has_value()) {
         qDebug() << "Found artist by name in DB: " << artist.name;
@@ -58,7 +58,7 @@ void ArtistService::onDiscogsArtistSearchReady(const std::vector<Artist>& artist
 
 // Called when DiscogsManager has fetched artist & release info
 void ArtistService::onDiscogsDataReady(const Artist& artist) {
-    // Cache artist & releases asynchronously to DB
+    // Cache artist & releases to DB
     cacheArtist(artist);
 
     // Emit signals as if artist was found in DB
@@ -67,44 +67,7 @@ void ArtistService::onDiscogsDataReady(const Artist& artist) {
 
 void ArtistService::onArtistFound(const Artist& artist) {
     m_session.addArtist(artist);
-    // Find collaborations (TODO: with currently displayed artists)
-
-  ; // placeholder
-    /* for context, this is the data type of m_sesison.artists:
-     *  struct SessionArtist {
-    QString id;    // Discogs ID
-    QString name;  // Artist name
-};
-using SessionArtists = QVector<SessionArtist>;
-
-
-Keep in mind, it's different from the Artist data type:
-struct Artist {
-    QString id;
-    QString name;
-    QString profile;
-    QString resourceUrl;
-    std::vector<ReleaseInfo> releases;
-};
-// Which is something we should likely redesign (later), since its confusing.
-     *
-     */
-
 }
-/*
-    //QMap<QString, std::vector<QString>> collabs;
-    //collabs = m_db.getAllCollaborations(artist.id);
-    /*
-    for (const auto& otherId : m_currentUIArtistIds) {
-        auto rels = m_db.findCollaborations(artist.id, otherId);
-        if (!rels.empty()) collabs[otherId] = rels;
-    }
-
-emit collaborationsReady(collabs);
-qDebug() << "collabs:" << collabs;
- */
-
-
 
 
 // Public: list cached artists
@@ -115,10 +78,8 @@ std::vector<Artist> ArtistService::listCachedArtists() const {
 // Private helper: cache artist in DB
 void ArtistService::cacheArtist(const Artist& artist) {
     qDebug() << "Storing Artist: " << artist;
-    //QtConcurrent::run([=]() {
-        m_db.saveArtist(artist);
-        m_db.saveReleases(artist.id, artist.releases);
-    //});
+    m_db.saveArtist(artist);
+    m_db.saveReleases(artist.id, artist.releases);
 }
 
 std::vector<ReleaseInfo> ArtistService::parseReleasesJsonArray(const QJsonArray &releasesArray) {
@@ -146,3 +107,89 @@ void ArtistService::updateReleasesFromJson(const QJsonArray &jsonReleases, const
     auto releases = parseReleasesJsonArray(jsonReleases);
     m_db.saveReleases(artistId, releases);
 }
+
+void ArtistService::loadArtistsFromFile() {
+    QString fileName = QFileDialog::getOpenFileName(nullptr,
+                                                    tr("Open File"),
+                                                    "/home",
+                                                    tr("JSON files (*.json)"));
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning() << "Could not open file for reading:" << file.errorString();
+        return;
+    }
+
+    QByteArray data = file.readAll();
+    file.close();
+
+    QJsonDocument doc = QJsonDocument::fromJson(data);
+    if (!doc.isObject()) {
+        qWarning() << "Invalid JSON format";
+        return;
+    }
+
+    QJsonObject root = doc.object();
+    QJsonArray artistArray = root["artists"].toArray();
+
+    for (const QJsonValue &value : std::as_const(artistArray)) {
+        if (!value.isObject()) continue;
+
+        QJsonObject artistObj = value.toObject();
+        // QString id = artistObj["id"].toString();
+        QString name = artistObj["name"].toString();
+
+        if (!name.isEmpty()) {
+            searchByName(name);
+            // optionally you could check if ID already exists in local DB,
+            // or fetch by ID if that's more reliable than by name
+        }
+    }
+}
+void ArtistService::saveArtistsToFile() {
+    QString fileName = QFileDialog::getSaveFileName(nullptr,
+                                                    tr("Save File"),
+                                                    "/home/artists.json",
+                                                    tr("JSON files (*.json)"));
+    if (fileName.isEmpty()) {
+        return;
+    }
+
+    QJsonArray artistArray;
+    for (const auto &artist : sessionArtists()) {
+        QJsonObject artistObj;
+        artistObj["id"] = artist.id;       // assuming you have id and name fields
+        artistObj["name"] = artist.name;
+        artistArray.append(artistObj);
+    }
+
+    QJsonObject root;
+    root["artists"] = artistArray;
+
+    QJsonDocument doc(root);
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly)) {
+        qWarning() << "Could not open file for writing:" << file.errorString();
+        return;
+    }
+    file.write(doc.toJson(QJsonDocument::Indented));
+    file.close();
+}
+
+void ArtistService::removeSessionArtistById(const QString& artistId) {
+    m_session.removeArtistById(artistId);
+}
+
+void ArtistService::refreshSessionArtist(const QString& artistId) {
+    QString artistName = m_session.getArtistById(artistId)->name;
+    m_session.removeArtistById(artistId);
+    m_db.removeArtistById(artistId);
+
+    searchByName(artistName);
+}
+
+

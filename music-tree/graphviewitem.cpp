@@ -108,7 +108,6 @@ void GraphViewItem::updateLayout() {
 
 void GraphViewItem::paint(QPainter *painter)
 {
-
     painter->setRenderHint(QPainter::Antialiasing);
 
     const SessionCollaborations collabs = m_artistService->collabs();
@@ -116,17 +115,20 @@ void GraphViewItem::paint(QPainter *painter)
     for (const auto &e : std::as_const(collabs)) {
         QString artistId1 = e.first.a, artistId2 = e.first.b;
         int sharedReleasesCount = e.second.size();
+        painter->setPen(QPen(Qt::gray, std::min(8.0, 1.0 + sharedReleasesCount * 0.5)));
 
-        painter->setPen(QPen(Qt::gray, std::min(8.0, 1.0 + sharedReleasesCount *0.5)));
         painter->drawLine(nodeData[artistId1].pos, nodeData[artistId2].pos);
     }
 
     // Draw nodes
     for (const auto &n : std::as_const(nodeData)) {
-
         painter->setBrush(Qt::white);
         painter->setPen(Qt::black);
         painter->drawEllipse(n.pos, nodeRadius, nodeRadius);
+    }
+
+    // Draw names
+    for (const auto &n : std::as_const(nodeData)) {
         painter->drawText(n.pos.x()-nodeRadius/2, n.pos.y()-nodeRadius-5, n.name);
     }
 }
@@ -160,19 +162,19 @@ bool GraphViewItem::event(QEvent *ev)
     switch (ev->type()) {
     case QEvent::MouseButtonPress: {
         auto *me = static_cast<QMouseEvent*>(ev);
-        qDebug() << "Mouse press at" << me->pos();
+        // qDebug() << "Mouse press at" << me->pos();
         mousePressEvent(me);
         return true; // consume event
     }
     case QEvent::MouseMove: {
         auto *me = static_cast<QMouseEvent*>(ev);
-        qDebug() << "Mouse move at" << me->pos();
+        // qDebug() << "Mouse move at" << me->pos();
         mouseMoveEvent(me);
         return true;
     }
     case QEvent::MouseButtonRelease: {
         auto *me = static_cast<QMouseEvent*>(ev);
-        qDebug() << "Mouse release at" << me->pos();
+        // qDebug() << "Mouse release at" << me->pos();
         mouseReleaseEvent(me);
         return true;
     }
@@ -226,7 +228,7 @@ void GraphViewItem::mouseReleaseEvent(QMouseEvent *event) {
     event->accept();
 
     if (ui.mode == UiContext::Mode::DraggingNode && event->button() == Qt::LeftButton) {
-        qDebug() << "Dragging node ended:" << ui.activeNodeId;
+        // qDebug() << "Dragging node ended:" << ui.activeNodeId;
     }
     ui.activeNodeId.clear();
     ui.mode = UiContext::Mode::None;

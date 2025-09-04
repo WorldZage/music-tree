@@ -274,20 +274,6 @@ void DatabaseManager::saveReleases(const QString& artistId, const std::vector<Re
 
 
 // -----------------------------
-// Delete
-// -----------------------------
-void DatabaseManager::deleteArtist(const QString& artistId) {
-    QSqlDatabase db = getThreadConnection();
-    QSqlQuery query(db);
-    query.prepare("DELETE FROM artists WHERE id = :id");
-    query.bindValue(":id", artistId);
-
-    if (!query.exec()) {
-        qWarning() << "deleteArtist failed:" << query.lastError().text();
-    }
-}
-
-// -----------------------------
 // List all
 // -----------------------------
 std::vector<Artist> DatabaseManager::listArtists() const {
@@ -308,6 +294,81 @@ std::vector<Artist> DatabaseManager::listArtists() const {
     }
     return artists;
 }
+
+// -----------------------------
+// Delete
+// -----------------------------
+
+bool DatabaseManager::deleteArtistFromReleases(QSqlDatabase& db, const QString& artistId) {
+    QSqlQuery query(db);
+    query.prepare("DELETE FROM release_artists WHERE artist_id = :id");
+    query.bindValue(":id", artistId);
+    if (!query.exec()) {
+        qWarning() << "Failed to delete from release_artists:" << query.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool DatabaseManager::deleteArtistFromReleases(const QString& artistId) {
+    QSqlDatabase db = getThreadConnection();
+    return deleteArtistFromReleases(db, artistId);
+}
+
+bool DatabaseManager::deleteArtistFromArtists(QSqlDatabase& db, const QString& artistId) {
+    QSqlQuery query(db);
+    query.prepare("DELETE FROM artists WHERE id = :id");
+    query.bindValue(":id", artistId);
+    if (!query.exec()) {
+        qWarning() << "Failed to delete from artists:" << query.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool DatabaseManager::deleteArtistFromArtists(const QString& artistId) {
+    QSqlDatabase db = getThreadConnection();
+    return deleteArtistFromArtists(db, artistId);
+}
+
+bool DatabaseManager::cleanOrphanedReleases(QSqlDatabase& db) {
+    QSqlQuery query(db);
+    if (!query.exec(R"(
+        DELETE FROM releases
+        WHERE id NOT IN (SELECT DISTINCT release_id FROM release_artists)
+    )")) {
+        qWarning() << "Failed to clean orphaned releases:" << query.lastError().text();
+        return false;
+    }
+    return true;
+}
+
+bool DatabaseManager::cleanOrphanedReleases() {
+    QSqlDatabase db = getThreadConnection();
+    return cleanOrphanedReleases(db);
+}
+
+void DatabaseManager::removeArtistById(const QString& artistId) {
+    QSqlDatabase db = getThreadConnection();
+
+    if (!db.transaction()) {
+        qWarning() << "Failed to start transaction:" << db.lastError().text();
+        return;
+    }
+
+    if (!deleteArtistFromReleases(db, artistId) ||
+        !deleteArtistFromArtists(db, artistId) ||
+        !cleanOrphanedReleases(db)) {
+        db.rollback();
+        return;
+    }
+
+    if (!db.commit()) {
+        qWarning() << "Transaction commit failed:" << db.lastError().text();
+        db.rollback();
+    }
+}
+
 
 // -----------------------------
 // Clear DB (wipe all rows, keep schema)

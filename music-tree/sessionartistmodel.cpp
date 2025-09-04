@@ -33,14 +33,3 @@ QVariant SessionArtistModel::data(const QModelIndex& index, int role) const {
     return QVariant();
 }
 
-void SessionArtistModel::removeSessionArtistByListIndex(const int listIndex) {
-    m_session->removeArtistByListIndex(listIndex);
-}
-
-/*QHash<int, QByteArray> SessionArtistModel::roleNames() const {
-    return {
-        {IdRole, "id"},
-        {NameRole, "name"}
-    };
-}
-*/

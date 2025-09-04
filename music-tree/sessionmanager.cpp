@@ -1,11 +1,30 @@
 // SessionManager.cpp
 #include "sessionmanager.h"
-#include <QDebug>
+
 
 SessionManager::SessionManager(QObject* parent) : QObject(parent) {
 }
 
+
+const Artist* SessionManager::getArtistById(const QString& artistId) {
+    std::optional<Artist> result;
+    for (const Artist& a : std::as_const(m_artists)) {
+        if (a.id == artistId) {
+            return &a;
+        }
+    }
+    return nullptr;
+}
+
+bool SessionManager::containsArtist(const Artist& artist) {
+    for (const Artist& a : std::as_const(m_artists)) {
+        if (a.id == artist.id) return true;
+    }
+    return false;
+}
+
 void SessionManager::addArtist(const Artist& artist) {
+    QMutexLocker locker(&sessionMutex);
     if (containsArtist(artist)) {
         qDebug() << "Artist already exists:" << artist.name;
         return;
@@ -16,17 +35,6 @@ void SessionManager::addArtist(const Artist& artist) {
     updateCollabsForNewArtist(artist);
 
     emit artistAdded(artist);
-}
-
-void SessionManager::removeArtistByListIndex(const int listIndex) {
-    if (listIndex < 0 || listIndex >= m_artists.size()) {
-        qWarning() << "removeArtistByListIndex: index out of range:" << listIndex;
-        return;
-    }
-    const QString id = m_artists.at(listIndex).id;
-    qDebug() << "remove artist of" << m_artists.at(listIndex).name
-             << "(id:" << id << ") at index:" << listIndex;
-    removeArtistById(id); // single authority
 }
 
 void SessionManager::removeArtistById(const QString& artistId) {
@@ -55,13 +63,6 @@ void SessionManager::removeCollabsForArtist(const QString& artistId) {
             ++it;
         }
     }
-}
-
-bool SessionManager::containsArtist(const Artist& artist) {
-    for (const Artist& a : std::as_const(m_artists)) {
-        if (a.id == artist.id) return true;
-    }
-    return false;
 }
 
 void SessionManager::registerArtistReleases(const Artist& artist) {
@@ -97,8 +98,6 @@ void SessionManager::updateCollabsForNewArtist(const Artist& newArtist) {
         }
     }
 }
-
-
 
 void SessionManager::clear() {
     m_artists.clear();
