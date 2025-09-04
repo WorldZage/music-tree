@@ -19,11 +19,10 @@ public:
     const QVector<Artist>& artists() const { return m_artists; }
     const SessionCollaborations& collabs() const { return m_collabs; }
 
-    void addArtist(const Artist& artist);
-
-
-    void removeArtistByListIndex(const int listIndex);
     bool containsArtist(const Artist& artist);
+    const Artist* getArtistById(const QString& artistId);
+    void addArtist(const Artist& artist);
+    void removeArtistById(const QString& artistId);
 
     // debugging / queries
     QVector<QString> getArtistsForRelease(const QString& releaseId) const;
@@ -35,8 +34,8 @@ signals:
     void artistRemoved(const Artist& artist);
     void sessionCleared();
 
+
 private:
-    void removeArtistById(const QString& artistId);
 
     void updateCollabsForNewArtist(const Artist& newArtist);
     void removeCollabsForArtist(const QString& artistId);

@@ -18,11 +18,14 @@ public:
 
     // Entry point for UI: searches for an artist by name
     Q_INVOKABLE void searchByName(const QString& name);
+
     Q_INVOKABLE void clearDb(void);
-
-
     Q_INVOKABLE void loadArtistsFromFile();
     Q_INVOKABLE void saveArtistsToFile();
+
+    Q_INVOKABLE void removeSessionArtistById(const QString& artistId);
+    Q_INVOKABLE void refreshSessionArtist(const QString& artistId);
+
 
     // TODO: Consider if these should be accessible through ArtistService or not:
     SessionManager *sessionManager() {

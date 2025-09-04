@@ -24,8 +24,6 @@ public:
         return { {ArtistIdRole, "artistId"}, {ArtistNameRole, "artistName"}};
     }
 
-    Q_INVOKABLE void removeSessionArtistByListIndex(const int listIndex);
-
 private:
     SessionManager* m_session;
 };

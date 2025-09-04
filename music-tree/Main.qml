@@ -93,14 +93,13 @@ ApplicationWindow {
                         Button {
                             text: "Refresh"
                             onClicked: {
-                                // stub: implement later
-                                artistService.refreshArtist(artistName, artistId, index)
+                                artistService.refreshSessionArtist(artistId)
                             }
                         }
 
                         Button {
                             text: "Remove"
-                            onClicked: sessionArtistModel.removeSessionArtistByListIndex(index)
+                            onClicked: artistService.removeSessionArtistById(artistId)
                         }
                     }
                 }

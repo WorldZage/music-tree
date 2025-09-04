@@ -179,3 +179,17 @@ void ArtistService::saveArtistsToFile() {
     file.write(doc.toJson(QJsonDocument::Indented));
     file.close();
 }
+
+void ArtistService::removeSessionArtistById(const QString& artistId) {
+    m_session.removeArtistById(artistId);
+}
+
+void ArtistService::refreshSessionArtist(const QString& artistId) {
+    QString artistName = m_session.getArtistById(artistId)->name;
+    m_session.removeArtistById(artistId);
+    m_db.removeArtistById(artistId);
+
+    searchByName(artistName);
+}
+
+

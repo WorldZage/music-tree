@@ -42,8 +42,12 @@ public:
     void saveReleases(const QString& artistId, const std::vector<ReleaseInfo>& releases);
 
 
-    // Delete artist by ID
-    void deleteArtist(const QString& artistId);
+    // Public overloads (convenience)
+    bool deleteArtistFromReleases(const QString& artistId);
+    bool deleteArtistFromArtists(const QString& artistId);
+    bool cleanOrphanedReleases();
+
+    void removeArtistById(const QString& artistId);
 
     // List all stored artists
     std::vector<Artist> listArtists() const;
@@ -61,8 +65,15 @@ private:
     // Initialization helpers
     bool initializeSchema();
 
+    // Transaction-aware overloads
+    bool deleteArtistFromReleases(QSqlDatabase& db, const QString& artistId);
+    bool deleteArtistFromArtists(QSqlDatabase& db, const QString& artistId);
+    bool cleanOrphanedReleases(QSqlDatabase& db);
+
     // TODO: Consider removing:
     std::vector<QString> findCollaborations(const QString& artistId1, const QString& artistId2) const;
     QMap<QString, std::vector<QString>> getAllCollaborations(const QString& artistId) const;
     std::optional<Artist> findArtistByName(const QString& name) const;
+
+
 };
